@@ -54,13 +54,21 @@ export async function middleware(req: NextRequest) {
 
     // If user is approved and trying to access pending approval page, redirect to dashboard
     if (userData?.is_approved && req.nextUrl.pathname === '/pending-approval') {
-      const dashboardPath = userData.role === 'admin' ? '/admin/dashboard' : '/student/dashboard';
+      const dashboardPath = userData.role === 'admin' 
+        ? '/admin/dashboard' 
+        : userData.role === 'alumni' 
+          ? '/alumni/dashboard' 
+          : '/student/dashboard';
       return NextResponse.redirect(new URL(dashboardPath, req.url));
     }
 
     // If user is approved and accessing auth pages, redirect to appropriate dashboard
     if (userData?.is_approved && ['/auth/signin', '/signup'].includes(req.nextUrl.pathname)) {
-      const dashboardPath = userData.role === 'admin' ? '/admin/dashboard' : '/student/dashboard';
+      const dashboardPath = userData.role === 'admin' 
+        ? '/admin/dashboard' 
+        : userData.role === 'alumni' 
+          ? '/alumni/dashboard' 
+          : '/student/dashboard';
       return NextResponse.redirect(new URL(dashboardPath, req.url));
     }
   }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { cn } from "@/lib/utils";
+import { UserProfileHeader } from "./user-profile-header";
 import {
   Users,
   User,
@@ -188,7 +189,8 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <main className="flex-1 flex flex-col min-h-screen">
-        <div className="hidden md:flex items-center justify-end gap-4 p-4 border-b border-border">
+        <div className="hidden md:flex items-center justify-between gap-4 p-4 border-b border-border">
+          <UserProfileHeader />
           <ThemeToggle />
         </div>
         <div className="flex-1 p-4 md:p-6 overflow-auto">{children}</div>

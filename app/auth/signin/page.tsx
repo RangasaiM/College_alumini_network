@@ -78,20 +78,25 @@ export default function SignInPage() {
         return;
       }
 
+      // Redirect based on role
+      let dashboardPath = "/student/dashboard";
+      if (userData.role === "admin") {
+        dashboardPath = "/admin/dashboard";
+      } else if (userData.role === "alumni") {
+        dashboardPath = "/alumni/dashboard";
+      }
+
+      // Show success message and redirect
       toast({
         title: "Sign in successful",
         description: "Welcome back!",
       });
 
-      // Redirect based on role
-      if (userData.role === "admin") {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/student/dashboard");
-      }
-      
       // Force a router refresh to ensure the middleware picks up the new session
       router.refresh();
+      
+      // Navigate to the appropriate dashboard
+      router.push(dashboardPath);
     } catch (error: any) {
       console.error("Sign in error:", error);
       toast({
@@ -168,7 +173,7 @@ export default function SignInPage() {
         <CardFooter className="flex flex-col space-y-4">
           <p className="text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <Link href="/auth/signup" className="text-primary hover:underline">
+            <Link href="/signup" className="text-primary hover:underline">
               Sign up
             </Link>
           </p>
