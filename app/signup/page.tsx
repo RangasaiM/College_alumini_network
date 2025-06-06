@@ -75,6 +75,18 @@ const formSchema = z.discriminatedUnion("role", [
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Define department options
+const DEPARTMENT_OPTIONS = [
+  "CSE",
+  "ECE",
+  "Mech",
+  "EEE",
+  "CSE(AI&ML)",
+  "CSE(DS)",
+  "CSE(IoT)",
+  "Civil"
+] as const;
+
 export default function SignUpPage() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<"student" | "alumni" | null>(
@@ -268,7 +280,7 @@ export default function SignUpPage() {
                         <FormItem>
                           <FormLabel>Batch Year</FormLabel>
                           <FormControl>
-                            <Input placeholder="2023" {...field} />
+                            <Input placeholder="2020" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -281,12 +293,23 @@ export default function SignUpPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Department</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Computer Science"
-                              {...field}
-                            />
-                          </FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your department" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {DEPARTMENT_OPTIONS.map((dept) => (
+                                <SelectItem key={dept} value={dept}>
+                                  {dept}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
