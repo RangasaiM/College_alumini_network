@@ -11,7 +11,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession();
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/auth/signin', '/auth/signup'];
+  const publicRoutes = ['/', '/auth/signin', '/signup', '/signup-success'];
   
   // Check if the current path is a public route
   const isPublicRoute = publicRoutes.some(route => 
@@ -59,7 +59,7 @@ export async function middleware(req: NextRequest) {
     }
 
     // If user is approved and accessing auth pages, redirect to appropriate dashboard
-    if (userData?.is_approved && ['/auth/signin', '/auth/signup'].includes(req.nextUrl.pathname)) {
+    if (userData?.is_approved && ['/auth/signin', '/signup'].includes(req.nextUrl.pathname)) {
       const dashboardPath = userData.role === 'admin' ? '/admin/dashboard' : '/student/dashboard';
       return NextResponse.redirect(new URL(dashboardPath, req.url));
     }
