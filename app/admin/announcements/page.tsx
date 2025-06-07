@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 
 import { Suspense } from "react";
-import DashboardLayout from "@/components/layout/dashboard-layout";
 import { getSession, getUserDetails } from "@/lib/supabase/auth-helpers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,44 +22,42 @@ export default async function AnnouncementsPage() {
   }
 
   return (
-    <DashboardLayout role="admin">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Announcements</h1>
-          <p className="text-muted-foreground">
-            Create and manage announcements for all users
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create Announcement</CardTitle>
-              <CardDescription>
-                Post a new announcement for students and alumni
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AnnouncementForm userId={userDetails.id} />
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Announcements</CardTitle>
-              <CardDescription>
-                View and manage your announcements
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<AnnouncementsLoadingSkeleton />}>
-                <AnnouncementsList limit={5} />
-              </Suspense>
-            </CardContent>
-          </Card>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Announcements</h1>
+        <p className="text-muted-foreground">
+          Create and manage announcements for all users
+        </p>
       </div>
-    </DashboardLayout>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Create Announcement</CardTitle>
+            <CardDescription>
+              Post a new announcement for students and alumni
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AnnouncementForm userId={userDetails.id} />
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Announcements</CardTitle>
+            <CardDescription>
+              View and manage your announcements
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<AnnouncementsLoadingSkeleton />}>
+              <AnnouncementsList limit={5} />
+            </Suspense>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
 

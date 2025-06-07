@@ -1,8 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function Home() {
+  const router = useRouter();
+
+  const handleNavigation = (path: string) => {
+    router.push(path);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <header className="container mx-auto py-6 px-4 flex justify-between items-center">
@@ -24,12 +33,17 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <Link href="/auth/signin">
-            <Button variant="outline">Sign In</Button>
-          </Link>
-          <Link href="/signup">
-            <Button>Join Now</Button>
-          </Link>
+          <Button 
+            variant="outline" 
+            onClick={() => handleNavigation('/auth/signin')}
+          >
+            Sign In
+          </Button>
+          <Button 
+            onClick={() => handleNavigation('/signup')}
+          >
+            Join Now
+          </Button>
         </div>
       </header>
 
@@ -48,20 +62,21 @@ export default function Home() {
               professional network.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link href="/signup">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Get Started
-                </Button>
-              </Link>
-              <Link href="/auth/signin">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full sm:w-auto"
-                >
-                  Sign In
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                className="w-full sm:w-auto"
+                onClick={() => handleNavigation('/signup')}
+              >
+                Get Started
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full sm:w-auto"
+                onClick={() => handleNavigation('/auth/signin')}
+              >
+                Sign In
+              </Button>
             </div>
           </div>
           <div className="relative w-full max-w-md">

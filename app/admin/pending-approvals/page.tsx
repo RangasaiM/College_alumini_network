@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { Suspense } from "react";
-import DashboardLayout from "@/components/layout/dashboard-layout";
 import { getSession, getUserDetails, getPendingUsers } from "@/lib/supabase/auth-helpers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -22,30 +22,28 @@ export default async function PendingApprovalsPage() {
   }
 
   return (
-    <DashboardLayout role="admin">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Pending Approvals</h1>
-          <p className="text-muted-foreground">
-            Manage user account approval requests
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>User Approval Requests</CardTitle>
-            <CardDescription>
-              Review and approve new user registrations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<PendingUsersLoadingSkeleton />}>
-              <PendingUsersList />
-            </Suspense>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Pending Approvals</h1>
+        <p className="text-muted-foreground">
+          Manage user account approval requests
+        </p>
       </div>
-    </DashboardLayout>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>User Approval Requests</CardTitle>
+          <CardDescription>
+            Review and approve new user registrations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<PendingUsersLoadingSkeleton />}>
+            <PendingUsersList />
+          </Suspense>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

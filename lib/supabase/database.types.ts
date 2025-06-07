@@ -20,7 +20,8 @@ export interface Database {
           github_url: string | null;
           leetcode_url: string | null;
           linkedin_url: string | null;
-          current_job: string | null;
+          current_company: string | null;
+          current_position: string | null;
           skills: string[] | null;
           avatar_url: string | null;
           resume_url: string | null;
@@ -40,7 +41,8 @@ export interface Database {
           github_url?: string | null;
           leetcode_url?: string | null;
           linkedin_url?: string | null;
-          current_job?: string | null;
+          current_company?: string | null;
+          current_position?: string | null;
           skills?: string[] | null;
           avatar_url?: string | null;
           resume_url?: string | null;
@@ -60,7 +62,8 @@ export interface Database {
           github_url?: string | null;
           leetcode_url?: string | null;
           linkedin_url?: string | null;
-          current_job?: string | null;
+          current_company?: string | null;
+          current_position?: string | null;
           skills?: string[] | null;
           avatar_url?: string | null;
           resume_url?: string | null;
@@ -120,15 +123,48 @@ export interface Database {
           is_read?: boolean;
         };
       };
+      connections: {
+        Row: {
+          id: string;
+          requester_id: string;
+          receiver_id: string;
+          status: "pending" | "accepted" | "rejected";
+          message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          receiver_id: string;
+          status?: "pending" | "accepted" | "rejected";
+          message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          requester_id?: string;
+          receiver_id?: string;
+          status?: "pending" | "accepted" | "rejected";
+          message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      is_admin: {
+        Args: { user_id: string };
+        Returns: boolean;
+      };
     };
     Enums: {
-      [_ in never]: never;
+      user_role: "student" | "alumni" | "admin";
+      connection_status: "pending" | "accepted" | "rejected";
     };
   };
 }

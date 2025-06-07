@@ -1,14 +1,15 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { type Session, type User } from "@supabase/supabase-js";
 
 type SupabaseContextType = {
-  supabase: ReturnType<typeof createClientComponentClient>;
+  supabase: ReturnType<typeof createBrowserClient>;
   session: Session | null;
   user: User | null;
+  isLoading: boolean;
 };
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(
@@ -22,15 +23,29 @@ export default function SupabaseProvider({
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   useEffect(() => {
+    let mounted = true;
+
     const getSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (!error) {
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (!error && mounted) {
+          setSession(data.session);
+          setUser(data.session?.user ?? null);
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -38,19 +53,26 @@ export default function SupabaseProvider({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      router.refresh();
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (mounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Only refresh the router for specific auth events
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+          router.refresh();
+        }
+      }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [router, supabase]);
 
   return (
-    <SupabaseContext.Provider value={{ supabase, session, user }}>
+    <SupabaseContext.Provider value={{ supabase, session, user, isLoading }}>
       {children}
     </SupabaseContext.Provider>
   );

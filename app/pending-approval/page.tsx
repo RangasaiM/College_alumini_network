@@ -1,46 +1,92 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createServerSupabaseClient } from "@/lib/supabase/auth-helpers";
-import Link from "next/link";
+"use client";
 
-export default async function PendingApprovalPage() {
-  const supabase = createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const { data: userData } = await supabase
-    .from('users')
-    .select('email, full_name')
-    .eq('id', session?.user?.id)
-    .single();
+import { useEffect, useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export default function PendingApprovalPage() {
+  const router = useRouter();
+  const [userData, setUserData] = useState<any>(null);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push('/auth/signin');
+        return;
+      }
+
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user data:', error);
+        return;
+      }
+
+      if (user.is_approved) {
+        // If user is approved, redirect to their dashboard
+        const dashboardPath = user.role === 'admin' 
+          ? '/admin/dashboard' 
+          : user.role === 'alumni'
+            ? '/alumni/dashboard'
+            : '/student/dashboard';
+        router.push(dashboardPath);
+        return;
+      }
+
+      setUserData(user);
+    };
+
+    checkStatus();
+  }, [router, supabase]);
 
   return (
-    <div className="container flex items-center justify-center min-h-screen py-10">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <CardTitle>Approval Pending</CardTitle>
-          <CardDescription>
-            Your account is pending administrator approval
-          </CardDescription>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background to-secondary/10">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-4">
+            <Clock className="h-12 w-12 text-yellow-500" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-center">
+            Awaiting Approval
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">
+            Your account is currently pending approval from an administrator.
+          </p>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Hello {userData?.full_name || userData?.email},
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Thank you for signing up! Your account is currently pending approval from our administrators.
-              This helps us maintain the security and integrity of our alumni network.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              You will receive an email notification once your account has been approved.
-              If you have any questions, please contact the administrator.
-            </p>
+            <p className="font-medium">What to expect?</p>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• An administrator will review your account details</li>
+              <li>• You'll receive an email once your account is approved</li>
+              <li>• After approval, you can sign in and access all features</li>
+            </ul>
           </div>
-          <div className="flex justify-end">
-            <Button variant="outline" asChild>
-              <Link href="/auth/signout">Sign Out</Link>
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground mt-4">
+            This process usually takes 1-2 business days. Thank you for your patience!
+          </p>
         </CardContent>
+        <CardFooter className="flex justify-center">
+          <Link href="/auth/signin">
+            <Button variant="outline">
+              Return to Sign In
+            </Button>
+          </Link>
+        </CardFooter>
       </Card>
     </div>
   );

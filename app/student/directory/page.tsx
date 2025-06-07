@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import DashboardLayout from "@/components/layout/dashboard-layout";
 import { getSession, getUserDetails } from "@/lib/supabase/auth-helpers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,36 +20,34 @@ export default async function StudentDirectoryPage() {
   }
 
   return (
-    <DashboardLayout role="student">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Alumni Directory</h1>
-          <p className="text-muted-foreground">
-            Connect with alumni for networking and mentorship
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Search Alumni</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DirectorySearch filterRole="alumni" />
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Alumni Network</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<DirectoryLoadingSkeleton />}>
-              <UserDirectory filterRole="alumni" />
-            </Suspense>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Alumni Directory</h1>
+        <p className="text-muted-foreground">
+          Connect with alumni for networking and mentorship
+        </p>
       </div>
-    </DashboardLayout>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Search Alumni</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DirectorySearch filterRole="alumni" />
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Alumni Network</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<DirectoryLoadingSkeleton />}>
+            <UserDirectory filterRole="alumni" />
+          </Suspense>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

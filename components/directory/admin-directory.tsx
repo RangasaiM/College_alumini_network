@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/auth-helpers";
+import { getServerSupabase } from "@/lib/supabase/auth-helpers";
 import { UserDirectoryClient } from "./user-directory-client";
 
 interface User {
@@ -14,7 +14,7 @@ interface User {
 }
 
 async function getUsers(): Promise<User[]> {
-  const supabase = createServerSupabaseClient();
+  const supabase = getServerSupabase();
   const { data: users, error } = await supabase
     .from("users")
     .select("*")

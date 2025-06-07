@@ -1,198 +1,234 @@
 "use client";
 
-import { useState, ReactNode } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useSupabase } from "@/components/providers/supabase-provider";
-import { cn } from "@/lib/utils";
+import { useState, ReactNode, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { CompletionReminder } from "@/app/shared/profile/completion-reminder";
 import {
-  Users,
-  User,
-  LogOut,
-  Menu,
-  X,
-  Bell,
-  MessageSquare,
-  Search,
-  Home,
-  Settings,
-  UserPlus,
-  BarChart3,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, Bell } from "lucide-react";
+import { Sidebar } from "./sidebar";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { toast } from "sonner";
+import { useSupabase } from "@/components/providers/supabase-provider";
+
+interface UserData {
+  id: string;
+  role: "student" | "alumni" | "admin";
+  name: string;
+  email: string;
+  is_approved: boolean;
+  github_url?: string;
+  linkedin_url?: string;
+  leetcode_url?: string;
+  codechef_url?: string;
+  codeforces_url?: string;
+  current_company?: string;
+  current_role?: string;
+  experience_years?: number;
+  portfolio_url?: string;
+  skills: string[];
+  bio?: string;
+  [key: string]: any;
+}
 
 interface DashboardLayoutProps {
   children: ReactNode;
   role: "student" | "alumni" | "admin";
 }
 
+const getRequiredFields = (role: string): string[] => {
+  if (role === 'student') {
+    return ['github_url', 'linkedin_url', 'leetcode_url', 'codechef_url', 'codeforces_url', 'skills', 'bio'];
+  }
+  return ['current_company', 'current_role', 'experience_years', 'linkedin_url', 'github_url', 'portfolio_url', 'skills', 'bio'];
+};
+
 export default function DashboardLayout({
   children,
   role,
 }: DashboardLayoutProps) {
-  const pathname = usePathname();
   const router = useRouter();
-  const { supabase } = useSupabase();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { supabase, session, isLoading: isSessionLoading } = useSupabase();
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [showReminder, setShowReminder] = useState(false);
+  const [showPendingDialog, setShowPendingDialog] = useState(false);
+  const [notifications, setNotifications] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
+  useEffect(() => {
+    let mounted = true;
+
+    const checkProfileStatus = async () => {
+      if (!session?.user?.id) {
+        if (!isSessionLoading) {
+          router.replace('/auth/signin');
+        }
+        return;
+      }
+
+      try {
+        // Get user data
+        const { data, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userError) {
+          console.error('User data error:', userError);
+          toast.error('Error fetching user data: ' + userError.message);
+          if (mounted) {
+            router.replace('/auth/signin');
+          }
+          return;
+        }
+
+        if (!data) {
+          if (mounted) {
+            router.replace('/signup');
+          }
+          return;
+        }
+
+        // Set user data and handle profile completion
+        const typedData = data as UserData;
+        
+        if (!mounted) return;
+        
+        setUserData(typedData);
+
+        // Check if user role matches the page role
+        if (typedData.role !== role) {
+          toast.error('You do not have access to this page');
+          if (mounted) {
+            router.replace(`/${typedData.role}/dashboard`);
+          }
+          return;
+        }
+
+        // Check if user is approved
+        if (!typedData.is_approved && role !== 'admin') {
+          if (mounted) {
+            router.replace('/pending-approval');
+          }
+          return;
+        }
+
+        // Handle approval status
+        if (role === 'admin') {
+          setShowPendingDialog(false);
+        } else if (!typedData.is_approved) {
+          setShowPendingDialog(true);
+        }
+
+        setIsLoading(false);
+      } catch (error: any) {
+        console.error('Error checking profile status:', error);
+        toast.error('Error checking profile status: ' + (error.message || 'An unexpected error occurred'));
+        if (mounted) {
+          router.replace('/auth/signin');
+        }
+      }
+    };
+
+    checkProfileStatus();
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.user?.id, role, supabase, router, isSessionLoading]);
+
+  const handleEditProfile = () => {
+    router.push(`/${role}/profile/edit`);
+    setShowPendingDialog(false);
   };
 
-  // Generate navigation links based on role
-  const navLinks = [
-    {
-      href: `/${role}/dashboard`,
-      label: "Dashboard",
-      icon: <Home className="h-5 w-5" />,
-    },
-    {
-      href: `/${role}/profile`,
-      label: "Profile",
-      icon: <User className="h-5 w-5" />,
-    },
-    {
-      href: `/${role}/directory`,
-      label: "Directory",
-      icon: <Search className="h-5 w-5" />,
-    },
-    {
-      href: `/${role}/messages`,
-      label: "Messages",
-      icon: <MessageSquare className="h-5 w-5" />,
-    },
-  ];
+  const handleNotificationsClick = () => {
+    router.push(`/${role}/notifications`);
+  };
 
-  // Add admin-specific links
-  if (role === "admin") {
-    navLinks.push(
-      {
-        href: "/admin/pending-approvals",
-        label: "Pending Approvals",
-        icon: <UserPlus className="h-5 w-5" />,
-      },
-      {
-        href: "/admin/announcements",
-        label: "Announcements",
-        icon: <Bell className="h-5 w-5" />,
-      },
-      {
-        href: "/admin/analytics",
-        label: "Analytics",
-        icon: <BarChart3 className="h-5 w-5" />,
-      }
+  if (isSessionLoading || isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
     );
   }
 
-  // Add settings link
-  navLinks.push({
-    href: `/${role}/settings`,
-    label: "Settings",
-    icon: <Settings className="h-5 w-5" />,
-  });
+  if (!userData) {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Mobile header */}
-      <header className="md:hidden border-b border-border p-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          >
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle menu</span>
-          </Button>
-          <span className="text-xl font-bold">AlumniConnect</span>
-        </div>
-        <ThemeToggle />
-      </header>
-
-      {/* Mobile sidebar overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed top-0 left-0 z-50 h-full w-64 border-r border-border bg-card transition-transform md:relative md:translate-x-0",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="flex h-full flex-col">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-6 w-6 text-primary"
-              >
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              <span className="text-xl font-bold">AlumniConnect</span>
-            </div>
+    <div className="flex h-screen">
+      <Sidebar role={role} />
+      <div className="flex-1 flex flex-col">
+        <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold">
+              {role.charAt(0).toUpperCase() + role.slice(1)} Dashboard
+            </h1>
+          </div>
+          <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden"
+              className="relative"
+              onClick={handleNotificationsClick}
             >
-              <X className="h-5 w-5" />
-              <span className="sr-only">Close menu</span>
+              <Bell className="h-5 w-5" />
+              {notifications > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
+                  {notifications}
+                </span>
+              )}
             </Button>
+            <ThemeToggle />
           </div>
-
-          <nav className="flex-1 overflow-auto p-4 space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  pathname === link.href
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-secondary"
-                )}
-              >
-                {link.icon}
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="border-t border-border p-4">
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-screen">
-        <div className="hidden md:flex items-center justify-end gap-4 p-4 border-b border-border">
-          <ThemeToggle />
-        </div>
-        <div className="flex-1 p-4 md:p-6 overflow-auto">{children}</div>
-      </main>
+        </header>
+        <main className="flex-1 overflow-y-auto bg-background p-6">
+          {children}
+        </main>
+      </div>
+      <CompletionReminder
+        userRole={role}
+        profileData={userData}
+        isOpen={showReminder}
+        onOpenChange={setShowReminder}
+      />
+      {!isLoading && userData && !userData.is_approved && role !== 'admin' && (
+        <Dialog 
+          open={showPendingDialog} 
+          onOpenChange={setShowPendingDialog}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                Profile Pending Approval
+              </DialogTitle>
+              <DialogDescription>
+                Your profile is currently pending approval from an administrator. 
+                While you wait, you can complete your profile to speed up the approval process.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-4 mt-6">
+              <Button variant="outline" onClick={() => setShowPendingDialog(false)}>
+                Close
+              </Button>
+              <Button onClick={handleEditProfile}>
+                Complete Profile
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/auth-helpers";
+import { getServerSupabase } from "@/lib/supabase/auth-helpers";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +11,7 @@ interface UserDirectoryProps {
 }
 
 export async function UserDirectory({ filterRole }: UserDirectoryProps) {
-  const supabase = createServerSupabaseClient();
+  const supabase = getServerSupabase();
   
   // Get search parameters from URL
   let baseUrl = "http://localhost:3000";
@@ -114,7 +114,7 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
               <Avatar className="h-12 w-12">
                 <AvatarImage src={user.avatar_url || ""} />
                 <AvatarFallback>
-                  {user.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U"}
+                  {user.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -136,7 +136,7 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
             <div className="mt-4">
               {user.skills && user.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {user.skills.slice(0, 3).map((skill) => (
+                  {user.skills.slice(0, 3).map((skill: string) => (
                     <Badge key={skill} variant="secondary" className="text-xs">
                       {skill}
                     </Badge>

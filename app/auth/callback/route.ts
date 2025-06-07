@@ -1,58 +1,39 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
+export async function GET(req: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set(name, value, options);
+        },
+        remove(name: string, options: any) {
+          cookieStore.set(name, '', options);
+        },
+      },
+    }
+  );
+
+  const { searchParams } = new URL(req.url);
+  const code = searchParams.get('code');
+  const next = searchParams.get('next') ?? '/';
 
   if (code) {
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    // Exchange the code for a session
-    await supabase.auth.exchangeCodeForSession(code);
-
-    // Get the user's session
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (session) {
-      // Check if the user already exists in our users table
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('is_approved')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!existingUser) {
-        // This is a new signup - create user record with is_approved = false
-        await supabase.from('users').insert([
-          {
-            id: session.user.id,
-            email: session.user.email,
-            role: 'student', // Default role
-            is_approved: false,
-          },
-        ]);
-      }
-
-      // Check if user is approved
-      if (existingUser?.is_approved) {
-        // Redirect approved users to their dashboard
-        const { data: userData } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-
-        const dashboardPath = userData?.role === 'admin' ? '/admin/dashboard' : '/student/dashboard';
-        return NextResponse.redirect(new URL(dashboardPath, requestUrl.origin));
-      }
-
-      // Redirect unapproved users to pending approval page
-      return NextResponse.redirect(new URL('/pending-approval', requestUrl.origin));
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      console.error('Auth callback error:', error);
+      return NextResponse.redirect(new URL('/auth/error', req.url));
     }
   }
 
-  // Redirect to home page if there's no code or session
-  return NextResponse.redirect(new URL('/', requestUrl.origin));
+  return NextResponse.redirect(new URL(next, req.url));
 } 

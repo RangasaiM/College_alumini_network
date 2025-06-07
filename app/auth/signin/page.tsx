@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/hooks/use-toast";
 
 import {
@@ -38,7 +38,10 @@ type FormValues = z.infer<typeof formSchema>;
 export default function SignInPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
@@ -64,16 +67,30 @@ export default function SignInPage() {
         throw new Error("No user data found");
       }
 
+      // Add a small delay to ensure user data is available
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Get user role and approval status
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("role, is_approved")
         .eq("id", authData.user.id)
-        .single();
+        .maybeSingle();
 
       if (userError) throw userError;
 
-      if (!userData?.is_approved) {
+      // If no user data found, they might be a new signup
+      if (!userData) {
+        toast({
+          title: "Account setup incomplete",
+          description: "Please complete your profile setup.",
+          variant: "destructive",
+        });
+        router.push("/auth/signup");
+        return;
+      }
+
+      if (!userData.is_approved) {
         router.push("/pending-approval");
         return;
       }
@@ -84,10 +101,18 @@ export default function SignInPage() {
       });
 
       // Redirect based on role
-      if (userData.role === "admin") {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/student/dashboard");
+      switch (userData.role) {
+        case "admin":
+          router.push("/admin/dashboard");
+          break;
+        case "alumni":
+          router.push("/alumni/dashboard");
+          break;
+        case "student":
+          router.push("/student/dashboard");
+          break;
+        default:
+          router.push("/");
       }
       
       // Force a router refresh to ensure the middleware picks up the new session
@@ -168,7 +193,7 @@ export default function SignInPage() {
         <CardFooter className="flex flex-col space-y-4">
           <p className="text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <Link href="/auth/signup" className="text-primary hover:underline">
+            <Link href="/signup" className="text-primary hover:underline">
               Sign up
             </Link>
           </p>

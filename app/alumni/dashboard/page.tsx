@@ -1,111 +1,44 @@
 import { Suspense } from "react";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { getSession, getUserDetails } from "@/lib/supabase/auth-helpers";
+import { getServerSession, getServerUserDetails } from "@/lib/supabase/auth-helpers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, Users, MessageSquare } from "lucide-react";
 import { AnnouncementsList } from "@/components/announcements/announcements-list";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NetworkSection } from "@/app/shared/network/network-section";
 
 export default async function AlumniDashboardPage() {
-  const session = await getSession();
-  
-  if (!session) {
-    redirect("/signin");
-  }
-  
-  const userDetails = await getUserDetails();
-  
-  if (!userDetails || userDetails.role !== "alumni") {
+  const session = await getServerSession();
+  const user = await getServerUserDetails();
+
+  if (!session || !user) {
     redirect("/");
   }
 
   return (
-    <DashboardLayout role="alumni">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {userDetails.name}
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Alumni Network
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Connect</div>
-              <p className="text-xs text-muted-foreground">
-                Network with other alumni and students
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Announcements
-              </CardTitle>
-              <Bell className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Updates</div>
-              <p className="text-xs text-muted-foreground">
-                Stay informed about latest events
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Messages
-              </CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Chat</div>
-              <p className="text-xs text-muted-foreground">
-                Connect one-on-one with students
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <div className="md:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Latest Announcements</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Suspense fallback={<AnnouncementsLoadingSkeleton />}>
-                  <AnnouncementsList limit={5} />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </div>
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Mentorship Requests</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Students interested in your mentorship:
-                </p>
-                <Suspense fallback={<MentorshipLoadingSkeleton />}>
-                  <MentorshipRequestsList userId={userDetails.id} />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Welcome back, {user.name}!
+        </p>
       </div>
-    </DashboardLayout>
+
+      <NetworkSection userRole="alumni" />
+
+      <div className="grid gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Announcements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<Skeleton className="h-[200px]" />}>
+              <AnnouncementsList limit={3} />
+            </Suspense>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
 
