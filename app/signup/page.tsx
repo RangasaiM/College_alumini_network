@@ -205,7 +205,7 @@ export default function SignUpPage() {
           "Your account has been created and is pending approval. You'll be notified via email once approved.",
       });
 
-      router.push("/signup-success");
+      router.push(`/signup-success?email=${encodeURIComponent(data.email)}`);
     } catch (error: any) {
       console.error("Error during signup:", error);
       toast({

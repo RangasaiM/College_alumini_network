@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { cookies } from 'next/headers';
 
 // Create a new ratelimiter that allows 10 requests per 10 seconds
 const ratelimit = new Ratelimit({
@@ -12,38 +13,21 @@ const ratelimit = new Ratelimit({
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
-
+  
+  // Create Supabase client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return req.cookies.get(name)?.value;
+          return cookies().get(name)?.value;
         },
         set(name: string, value: string, options: { expires?: Date }) {
-          req.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-          res.cookies.set({
-            name,
-            value,
-            ...options,
-          });
+          cookies().set(name, value, options);
         },
         remove(name: string, options: { expires?: Date }) {
-          req.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
-          res.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
+          cookies().set(name, '', options);
         },
       },
     }
@@ -69,6 +53,7 @@ export async function middleware(req: NextRequest) {
 
     // If user is not signed in and trying to access a protected route
     if (!session) {
+      console.log('No session found, redirecting to signin');
       return NextResponse.redirect(new URL('/auth/signin', req.url));
     }
 
@@ -86,16 +71,27 @@ export async function middleware(req: NextRequest) {
 
     // If no user details found, redirect to signup
     if (!userDetails) {
+      console.log('No user details found, redirecting to signup');
       return NextResponse.redirect(new URL('/signup', req.url));
     }
 
+    // Log user status for debugging
+    console.log('User status:', {
+      id: session.user.id,
+      role: userDetails.role,
+      is_approved: userDetails.is_approved,
+      path: req.nextUrl.pathname
+    });
+
     // If user is not approved and trying to access any route except pending-approval
     if (!userDetails.is_approved && !req.nextUrl.pathname.startsWith('/pending-approval')) {
+      console.log('User not approved, redirecting to pending-approval');
       return NextResponse.redirect(new URL('/pending-approval', req.url));
     }
 
     // If user is approved but trying to access pending-approval
     if (userDetails.is_approved && req.nextUrl.pathname.startsWith('/pending-approval')) {
+      console.log('Approved user accessing pending-approval, redirecting to dashboard');
       return NextResponse.redirect(new URL(`/${userDetails.role}/dashboard`, req.url));
     }
 

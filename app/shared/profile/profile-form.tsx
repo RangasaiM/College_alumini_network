@@ -15,8 +15,10 @@ import { cn } from "@/lib/utils";
 import { updateProfile } from '@/app/actions/profile';
 import { toast } from 'sonner';
 import { X, Plus, Check } from 'lucide-react';
+import { AvatarUpload } from '@/components/ui/avatar-upload';
 
 const formSchema = z.object({
+  avatar_url: z.string().optional(),
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
   department: z.string().optional(),
   batch_year: z.string().optional(),
@@ -98,6 +100,7 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      avatar_url: initialData?.avatar_url || '',
       name: initialData?.name || '',
       department: initialData?.department || '',
       batch_year: initialData?.batch_year?.toString() || '',
@@ -169,6 +172,25 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="avatar_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Profile Picture</FormLabel>
+              <FormControl>
+                <AvatarUpload
+                  userId={initialData?.id}
+                  url={field.value}
+                  onUploadComplete={(url) => field.onChange(url)}
+                  className="mb-4"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="name"

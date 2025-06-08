@@ -78,8 +78,8 @@ CREATE POLICY "Enable read access for authenticated users"
 
 CREATE POLICY "Enable update for users based on id"
     ON public.users FOR UPDATE
-    USING (auth.uid() = id)
-    WITH CHECK (auth.uid() = id);
+    USING (auth.uid() = id OR public.is_admin())
+    WITH CHECK (auth.uid() = id OR public.is_admin());
 
 CREATE POLICY "Enable insert for authenticated users"
     ON public.users FOR INSERT
