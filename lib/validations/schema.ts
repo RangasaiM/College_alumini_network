@@ -59,7 +59,7 @@ export const searchSchema = z.object({
     role: z.enum(['student', 'alumni', 'all']).optional(),
     skills: z.array(z.string()).optional(),
     graduation_year: z.number().optional(),
-    company: z.string().optional(),
+    current_company: z.string().optional(),
   }).optional(),
   page: z.number().min(1).optional(),
   limit: z.number().min(1).max(50).optional(),

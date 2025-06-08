@@ -46,6 +46,11 @@ export function Sidebar({ role }: SidebarProps) {
       icon: <User className="h-5 w-5" />,
     },
     {
+      href: `/${role}/connections`,
+      label: "Connections",
+      icon: <Users className="h-5 w-5" />,
+    },
+    {
       href: `/${role}/directory`,
       label: "Directory",
       icon: <Search className="h-5 w-5" />,

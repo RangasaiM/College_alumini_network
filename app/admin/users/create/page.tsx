@@ -1,6 +1,6 @@
 'use client';
 
-import { CreateAdminForm } from '../../../components/forms/create-admin-form';
+import { CreateAdminForm } from '@/components/forms/create-admin-form';
 
 export default function CreateAdminPage() {
     return (

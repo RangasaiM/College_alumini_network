@@ -1,153 +1,195 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ConnectionWithUser } from './types';
-import { formatDistanceToNow } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
+import { useState, useEffect } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+
+interface User {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  current_company: string | null;
+  current_position: string | null;
+  avatar_url: string | null;
+}
+
+interface Connection {
+  id: string;
+  status: 'pending' | 'accepted';
+  requester: User;
+  receiver: User;
+}
 
 interface ConnectionsListProps {
-  connections: ConnectionWithUser[];
+  connections: Connection[];
   onAccept: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 }
 
-export function ConnectionsList({
-  connections,
-  onAccept,
-  onReject,
-  onRemove,
-}: ConnectionsListProps) {
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'accepted'>('all');
+export function ConnectionsList({ connections: initialConnections, onAccept, onReject, onRemove }: ConnectionsListProps) {
+  const [activeTab, setActiveTab] = useState('all');
+  const [connections, setConnections] = useState(initialConnections);
+  const [loading, setLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { toast } = useToast();
-  const [loading, setLoading] = useState<string | null>(null);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  const filteredConnections = connections.filter(connection => {
-    if (activeTab === 'pending') return connection.status === 'pending';
-    if (activeTab === 'accepted') return connection.status === 'accepted';
-    return true;
-  });
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getCurrentUser();
+  }, [supabase]);
 
-  const handleAction = async (action: 'accept' | 'reject' | 'remove', connection: ConnectionWithUser) => {
+  const handleAction = async (action: 'accept' | 'reject' | 'remove', connectionId: string) => {
     try {
-      setLoading(connection.id);
-      if (action === 'accept') await onAccept(connection.id);
-      else if (action === 'reject') await onReject(connection.id);
-      else await onRemove(connection.id);
-      
+      setLoading(true);
+      switch (action) {
+        case 'accept':
+          await onAccept(connectionId);
+          // Update the connection status in local state
+          setConnections(prev => prev.map(conn => 
+            conn.id === connectionId 
+              ? { ...conn, status: 'accepted' }
+              : conn
+          ));
+          break;
+        case 'reject':
+          await onReject(connectionId);
+          // Remove the connection from local state
+          setConnections(prev => prev.filter(conn => conn.id !== connectionId));
+          break;
+        case 'remove':
+          await onRemove(connectionId);
+          // Remove the connection from local state
+          setConnections(prev => prev.filter(conn => conn.id !== connectionId));
+          break;
+      }
       toast({
         title: 'Success',
         description: `Connection ${action}ed successfully`,
       });
     } catch (error) {
+      console.error(`Error ${action}ing connection:`, error);
       toast({
         title: 'Error',
-        description: 'Failed to process your request',
+        description: `Failed to ${action} connection`,
         variant: 'destructive',
       });
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
-      case 'accepted':
-        return <Badge variant="outline">Connected</Badge>;
-      case 'rejected':
-        return <Badge variant="destructive">Rejected</Badge>;
-      default:
-        return null;
-    }
-  };
+  const filteredConnections = connections.filter(connection => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'pending') return connection.status === 'pending';
+    if (activeTab === 'accepted') return connection.status === 'accepted';
+    return true;
+  });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>My Network</CardTitle>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-          <TabsList>
+        <CardTitle>Connections</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="accepted">Connected</TabsTrigger>
+            <TabsTrigger value="accepted">Accepted</TabsTrigger>
           </TabsList>
-        </Tabs>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {filteredConnections.length === 0 ? (
-          <p className="text-center text-muted-foreground py-4">
-            No connections found
-          </p>
-        ) : (
-          filteredConnections.map((connection) => (
-            <div
-              key={connection.id}
-              className="flex items-center justify-between p-4 border rounded-lg"
-            >
-              <div className="flex items-center gap-4">
-                <Avatar>
-                  <AvatarImage src={connection.requester.avatar_url || ''} />
-                  <AvatarFallback>
-                    {connection.requester.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-medium">{connection.requester.name}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {connection.requester.role === 'student'
-                      ? `Student, Batch of ${connection.requester.batch_year}`
-                      : `${connection.requester.current_role} at ${connection.requester.current_company}`}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {getStatusBadge(connection.status)}
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(connection.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {connection.status === 'pending' && (
-                  <>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleAction('accept', connection)}
-                      disabled={!!loading}
-                    >
-                      Accept
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleAction('reject', connection)}
-                      disabled={!!loading}
-                    >
-                      Reject
-                    </Button>
-                  </>
-                )}
-                {connection.status === 'accepted' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAction('remove', connection)}
-                    disabled={!!loading}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
+          <TabsContent value={activeTab}>
+            <div className="space-y-4">
+              {filteredConnections.map((connection) => {
+                const otherUser = connection.requester.id === currentUserId
+                  ? connection.receiver
+                  : connection.requester;
+                const isRequester = connection.requester.id === currentUserId;
+
+                return (
+                  <Card key={connection.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <Avatar>
+                            <AvatarImage src={otherUser.avatar_url || undefined} />
+                            <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-semibold">{otherUser.name}</h3>
+                            <p className="text-sm text-gray-500">{otherUser.role}</p>
+                            {otherUser.department && (
+                              <p className="text-sm text-gray-500">{otherUser.department}</p>
+                            )}
+                            {otherUser.current_company && (
+                              <p className="text-sm text-gray-500">{otherUser.current_company}</p>
+                            )}
+                            {otherUser.current_position && (
+                              <p className="text-sm text-gray-500">{otherUser.current_position}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {connection.status === 'pending' ? (
+                            isRequester ? (
+                              <Badge variant="secondary">Request Sent</Badge>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleAction('accept', connection.id)}
+                                  disabled={loading}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleAction('reject', connection.id)}
+                                  disabled={loading}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )
+                          ) : (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleAction('remove', connection.id)}
+                              disabled={loading}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {filteredConnections.length === 0 && (
+                <p className="text-center text-gray-500">No connections found</p>
+              )}
             </div>
-          ))
-        )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

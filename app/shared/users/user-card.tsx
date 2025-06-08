@@ -11,7 +11,8 @@ interface UserCardProps {
     name: string;
     role: string;
     department?: string;
-    company?: string;
+    current_company?: string;
+    current_position?: string;
     avatar_url?: string;
     skills?: string[];
   };
@@ -20,43 +21,37 @@ interface UserCardProps {
 
 export function UserCard({ user, actions }: UserCardProps) {
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center space-x-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={user.avatar_url || ""} />
-            <AvatarFallback>
-              {user.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <h3 className="font-semibold">{user.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {user.role === "alumni" 
-                ? `${user.company || "Alumni"}`
-                : `Student ${user.department ? `• ${user.department}` : ""}`}
-            </p>
-          </div>
-          {actions && (
-            <div className="ml-auto">{actions}</div>
-          )}
-        </div>
-        
-        {user.skills && user.skills.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-4">
-            {user.skills.slice(0, 3).map((skill) => (
-              <Badge key={skill} variant="secondary" className="text-xs">
-                {skill}
-              </Badge>
-            ))}
-            {user.skills.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
-                +{user.skills.length - 3} more
-              </Badge>
+    <div className="flex flex-col space-y-4">
+      <div className="flex items-center space-x-4">
+        <Avatar className="h-16 w-16">
+          <AvatarImage src={user.avatar_url} />
+          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 space-y-1">
+          <h3 className="text-lg font-semibold">{user.name}</h3>
+          <div className="flex items-center space-x-2">
+            <Badge variant="secondary">{user.role}</Badge>
+            {user.department && (
+              <Badge variant="outline">{user.department}</Badge>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {user.current_company && (
+            <p className="text-sm text-muted-foreground">
+              {user.current_position ? `${user.current_position} at ` : ''}{user.current_company}
+            </p>
+          )}
+        </div>
+      </div>
+      {user.skills && user.skills.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {user.skills.map((skill) => (
+            <Badge key={skill} variant="secondary">
+              {skill}
+            </Badge>
+          ))}
+        </div>
+      )}
+      {actions && <div className="flex justify-end">{actions}</div>}
+    </div>
   );
 } 

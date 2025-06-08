@@ -103,6 +103,22 @@ export default function DashboardLayout({
         
         setUserData(typedData);
 
+        // Check profile completion
+        const requiredFields = getRequiredFields(role);
+        const completedFields = requiredFields.filter(field => {
+          if (field === 'skills') {
+            return Array.isArray(typedData[field]) && typedData[field].length > 0;
+          }
+          return !!typedData[field];
+        }).length;
+
+        const completionPercentage = (completedFields / requiredFields.length) * 100;
+        
+        // Show reminder if profile is not 100% complete
+        if (completionPercentage < 100) {
+          setShowReminder(true);
+        }
+
         // Check if user role matches the page role
         if (typedData.role !== role) {
           toast.error('You do not have access to this page');

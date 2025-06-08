@@ -17,8 +17,8 @@ import { toast } from 'sonner';
 import { X, Plus, Check } from 'lucide-react';
 
 const formSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-  department: z.string().optional(),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  department: z.string(),
   batch_year: z.string().optional(),
   graduation_year: z.string().optional(),
   location: z.string().optional(),
