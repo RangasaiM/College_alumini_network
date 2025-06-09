@@ -13,47 +13,81 @@ const ratelimit = new Ratelimit({
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  
-  // Create Supabase client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return cookies().get(name)?.value;
+          return req.cookies.get(name)?.value;
         },
-        set(name: string, value: string, options: { expires?: Date }) {
-          cookies().set(name, value, options);
+        set(name: string, value: string, options: any) {
+          res.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options: { expires?: Date }) {
-          cookies().set(name, '', options);
+        remove(name: string, options: any) {
+          res.cookies.set({ name, value: '', ...options });
         },
       },
     }
   );
 
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
+    const pathname = req.nextUrl.pathname;
+    console.log('Middleware: Starting check for path:', pathname);
+    
     // Public routes that don't require authentication
-    const publicRoutes = ['/', '/auth/signin', '/signup', '/signup-success', '/auth/error'];
+    const publicRoutes = ['/', '/auth/signin', '/signup', '/signup-success', '/auth/error', '/pending-approval'];
     
     // Check if the current path is a public route
     const isPublicRoute = publicRoutes.some(route => 
-      req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith('/public/')
+      pathname === route || pathname.startsWith('/public/')
     );
+
+    console.log('Middleware: Route info:', {
+      path: pathname,
+      isPublic: isPublicRoute
+    });
+
+    // Get session and verify it exists
+    const {
+      data: { session },
+      error: sessionError
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('Middleware: Session error:', sessionError);
+      return NextResponse.redirect(new URL('/auth/signin', req.url));
+    }
+
+    console.log('Middleware: Session status:', {
+      exists: !!session,
+      userId: session?.user?.id
+    });
 
     // Allow access to public routes without authentication
     if (isPublicRoute) {
+      console.log('Middleware: Allowing access to public route');
+      
+      // If user is authenticated and trying to access signin/signup, redirect to dashboard
+      if (session && (pathname === '/auth/signin' || pathname === '/signup')) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role, is_approved')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (userData?.role && userData.is_approved) {
+          console.log('Middleware: Authenticated user accessing public route, redirecting to dashboard');
+          return NextResponse.redirect(new URL(`/${userData.role}/dashboard`, req.url));
+        }
+      }
+      
       return res;
     }
 
     // If user is not signed in and trying to access a protected route
     if (!session) {
-      console.log('No session found, redirecting to signin');
+      console.log('Middleware: No session found, redirecting to signin');
       return NextResponse.redirect(new URL('/auth/signin', req.url));
     }
 
@@ -65,52 +99,56 @@ export async function middleware(req: NextRequest) {
       .single();
 
     if (userError) {
-      console.error('Error fetching user data:', userError);
+      console.error('Middleware: Error fetching user data:', userError);
+      // If the error is because the user doesn't exist, redirect to signup
+      if (userError.code === 'PGRST116') {
+        console.log('Middleware: User profile not found, redirecting to signup');
+        return NextResponse.redirect(new URL('/signup', req.url));
+      }
       return NextResponse.redirect(new URL('/auth/error', req.url));
     }
 
     // If no user details found, redirect to signup
     if (!userDetails) {
-      console.log('No user details found, redirecting to signup');
+      console.log('Middleware: No user details found, redirecting to signup');
       return NextResponse.redirect(new URL('/signup', req.url));
     }
 
-    // Log user status for debugging
-    console.log('User status:', {
+    console.log('Middleware: User status:', {
       id: session.user.id,
       role: userDetails.role,
       is_approved: userDetails.is_approved,
-      path: req.nextUrl.pathname
+      path: pathname
     });
 
     // If user is not approved and trying to access any route except pending-approval
-    if (!userDetails.is_approved && !req.nextUrl.pathname.startsWith('/pending-approval')) {
-      console.log('User not approved, redirecting to pending-approval');
+    if (!userDetails.is_approved && pathname !== '/pending-approval') {
+      console.log('Middleware: User not approved, redirecting to pending-approval');
       return NextResponse.redirect(new URL('/pending-approval', req.url));
     }
 
-    // If user is approved but trying to access pending-approval
-    if (userDetails.is_approved && req.nextUrl.pathname.startsWith('/pending-approval')) {
-      console.log('Approved user accessing pending-approval, redirecting to dashboard');
-      return NextResponse.redirect(new URL(`/${userDetails.role}/dashboard`, req.url));
+    // Check if user is trying to access their role-specific routes
+    const rolePrefix = `/${userDetails.role}`;
+    if (!pathname.startsWith(rolePrefix) && !pathname.startsWith('/api/')) {
+      console.log('Middleware: User accessing wrong role route, redirecting to correct dashboard');
+      return NextResponse.redirect(new URL(`${rolePrefix}/dashboard`, req.url));
     }
 
-    // Handle role-specific routes
-    if (req.nextUrl.pathname.startsWith('/admin') && userDetails.role !== 'admin') {
-      return NextResponse.redirect(new URL('/', req.url));
-    }
+    // Set session cookie with a longer expiration
+    res.cookies.set({
+      name: 'sb-session',
+      value: session.access_token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 7 days
+    });
 
-    if (req.nextUrl.pathname.startsWith('/student') && userDetails.role !== 'student') {
-      return NextResponse.redirect(new URL('/', req.url));
-    }
-
-    if (req.nextUrl.pathname.startsWith('/alumni') && userDetails.role !== 'alumni') {
-      return NextResponse.redirect(new URL('/', req.url));
-    }
-
+    console.log('Middleware: Access granted');
     return res;
+
   } catch (error) {
-    console.error('Middleware error:', error);
+    console.error('Middleware: Unexpected error:', error);
     return NextResponse.redirect(new URL('/auth/error', req.url));
   }
 }

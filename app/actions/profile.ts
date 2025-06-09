@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/utils/supabase/server';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
@@ -23,7 +23,30 @@ export async function updateProfile(formData: {
   skills?: string[]
 }) {
   try {
-    const supabase = await createClient();
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name: string, value: string, options: { expires?: Date }) {
+            cookieStore.set(name, value, options);
+          },
+          remove(name: string, options: { expires?: Date }) {
+            cookieStore.set(name, '', options);
+          },
+        },
+      }
+    );
+
+    // Get the current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      throw new Error('Not authenticated');
+    }
 
     // Clean up the data - convert empty strings to null
     const cleanData = Object.fromEntries(
@@ -37,13 +60,10 @@ export async function updateProfile(formData: {
       })
     );
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
     const { error } = await supabase
       .from('users')
       .update(cleanData)
-      .eq('id', user.id);
+      .eq('id', session.user.id);
 
     if (error) {
       console.error('Error updating profile:', error);

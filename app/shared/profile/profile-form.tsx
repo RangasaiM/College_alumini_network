@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -96,6 +96,9 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [isSkillPopoverOpen, setIsSkillPopoverOpen] = useState(false);
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const [hasImageChanged, setHasImageChanged] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -145,11 +148,21 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   };
 
   async function onSubmit(data: FormValues) {
+    if (isImageUploading) {
+      toast.error('Please wait for the image upload to complete');
+      return;
+    }
+
+    if (hasImageChanged && pendingImageUrl && data.avatar_url !== pendingImageUrl) {
+      data.avatar_url = pendingImageUrl;
+    }
+
     setIsLoading(true);
     try {
       const transformedData = {
         ...data,
         years_of_experience: data.years_of_experience ? parseInt(data.years_of_experience) : null,
+        updated_at: new Date().toISOString()
       };
 
       const result = await updateProfile(transformedData);
@@ -181,12 +194,25 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
               <FormControl>
                 <AvatarUpload
                   userId={initialData?.id}
-                  url={field.value}
-                  onUploadComplete={(url) => field.onChange(url)}
+                  url={hasImageChanged ? pendingImageUrl || field.value : field.value}
+                  onUploadComplete={(url) => {
+                    setPendingImageUrl(url);
+                    setHasImageChanged(true);
+                    setIsImageUploading(false);
+                  }}
+                  onUploadStart={() => {
+                    setIsImageUploading(true);
+                    setHasImageChanged(false);
+                  }}
                   className="mb-4"
                 />
               </FormControl>
               <FormMessage />
+              {hasImageChanged && pendingImageUrl && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  New image uploaded. Click Save Changes to update your profile with the new image.
+                </p>
+              )}
             </FormItem>
           )}
         />
@@ -605,8 +631,12 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
           </>
         )}
 
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? 'Saving...' : 'Save Changes'}
+        <Button 
+          type="submit" 
+          disabled={isLoading || isImageUploading}
+          className="w-full"
+        >
+          {isLoading ? 'Saving...' : isImageUploading ? 'Uploading Image...' : 'Save Changes'}
         </Button>
       </form>
     </Form>

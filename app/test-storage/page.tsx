@@ -1,76 +1,61 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 export default function TestStoragePage() {
   const [status, setStatus] = useState<string>('Checking...');
   const [error, setError] = useState<string | null>(null);
-  const [buckets, setBuckets] = useState<any[]>([]);
+  const [bucketInfo, setBucketInfo] = useState<any>(null);
 
   useEffect(() => {
-    async function checkStorage() {
+    async function setupStorage() {
       try {
-        // Log environment variables (without sensitive data)
-        console.log('NEXT_PUBLIC_SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
-        console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+        // First, try to set up the storage bucket
+        const response = await fetch('/api/storage/setup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        const supabase = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-
-        // Test authentication
-        const { data: { session }, error: authError } = await supabase.auth.getSession();
-        if (authError) throw new Error(`Auth error: ${authError.message}`);
+        const result = await response.json();
         
-        // Check if user is authenticated
-        if (!session) {
-          setStatus('Not authenticated. Please sign in first.');
-          return;
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to set up storage');
         }
 
-        // List all buckets
-        const { data: bucketsData, error: bucketsError } = await supabase
-          .storage
-          .listBuckets();
+        setBucketInfo(result.bucket);
+        setStatus('Storage bucket configured successfully');
 
-        if (bucketsError) throw new Error(`Buckets error: ${bucketsError.message}`);
-        
-        setBuckets(bucketsData || []);
-        
-        // Try to create avatars bucket if it doesn't exist
-        const avatarsBucketExists = bucketsData?.some(b => b.name === 'avatars');
-        
-        if (!avatarsBucketExists) {
-          const { data: newBucket, error: createError } = await supabase
-            .storage
-            .createBucket('avatars', {
-              public: true,
-              fileSizeLimit: 5242880,
-              allowedMimeTypes: [
-                'image/jpeg',
-                'image/jpg',
-                'image/png',
-                'image/gif',
-                'image/webp'
-              ]
-            });
+        // Now test the bucket by uploading a small test file
+        const supabase = getSupabaseClient();
+        const testData = new Blob(['test'], { type: 'text/plain' });
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload('test.txt', testData, {
+            cacheControl: '0',
+            upsert: true
+          });
 
-          if (createError) throw new Error(`Create bucket error: ${createError.message}`);
-          setStatus('Created avatars bucket successfully');
-        } else {
-          setStatus('Avatars bucket exists');
+        if (uploadError) {
+          throw new Error(`Upload test failed: ${uploadError.message}`);
         }
 
+        // Clean up the test file
+        await supabase.storage
+          .from('avatars')
+          .remove(['test.txt']);
+
+        setStatus('Storage is working correctly');
       } catch (error: any) {
-        console.error('Storage test error:', error);
+        console.error('Storage setup error:', error);
         setError(error.message);
         setStatus('Error occurred');
       }
     }
 
-    checkStorage();
+    setupStorage();
   }, []);
 
   return (
@@ -89,20 +74,14 @@ export default function TestStoragePage() {
         </div>
       )}
 
-      <div className="mb-4">
-        <h2 className="font-semibold">Available Buckets:</h2>
-        {buckets.length === 0 ? (
-          <p>No buckets found</p>
-        ) : (
-          <ul className="list-disc pl-5">
-            {buckets.map(bucket => (
-              <li key={bucket.id}>
-                {bucket.name} ({bucket.public ? 'public' : 'private'})
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {bucketInfo && (
+        <div className="mb-4">
+          <h2 className="font-semibold">Bucket Configuration:</h2>
+          <pre className="bg-gray-100 p-4 rounded mt-2">
+            {JSON.stringify(bucketInfo, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 } 

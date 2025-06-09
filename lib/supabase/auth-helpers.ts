@@ -52,48 +52,105 @@ export const getServerSupabase = cache(() => {
 export const getSession = cache(async () => {
   const supabase = getServerSupabase();
   try {
+    console.log('Auth Helper: Getting server session');
     const {
       data: { session },
+      error
     } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error('Auth Helper: Session error:', error);
+      return null;
+    }
+
+    console.log('Auth Helper: Session status:', {
+      exists: !!session,
+      userId: session?.user?.id
+    });
+
     return session;
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Auth Helper: Unexpected error:', error);
     return null;
   }
 });
 
 export const getServerUserDetails = cache(async () => {
+  console.log('Auth Helper: Getting user details');
   const session = await getSession();
-  if (!session?.user?.id) return null;
+  
+  if (!session?.user?.id) {
+    console.log('Auth Helper: No session for user details');
+    return null;
+  }
 
   const supabase = getServerSupabase();
-  const { data: userDetails } = await supabase
-    .from('users')
-    .select(`
-      id,
-      email,
-      name,
-      role,
-      department,
-      batch_year,
-      graduation_year,
-      current_company,
-      current_position,
-      location,
-      bio,
-      linkedin_url,
-      github_url,
-      twitter_url,
-      website_url,
-      avatar_url,
-      is_approved,
-      created_at,
-      updated_at
-    `)
-    .eq('id', session.user.id)
-    .single();
+  try {
+    // First, check if the user exists with minimal fields
+    const { data: basicUserData, error: basicError } = await supabase
+      .from('users')
+      .select('id, email, name, role, is_approved')
+      .eq('id', session.user.id)
+      .single();
 
-  return userDetails;
+    if (basicError) {
+      console.error('Auth Helper: Error fetching basic user details:', basicError);
+      return null;
+    }
+
+    if (!basicUserData) {
+      console.log('Auth Helper: No user profile found');
+      return null;
+    }
+
+    // Then try to get all fields, but handle gracefully if some don't exist
+    try {
+      const { data: fullUserData, error: fullError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          name,
+          role,
+          department,
+          batch_year,
+          graduation_year,
+          current_company,
+          current_position,
+          location,
+          bio,
+          linkedin_url,
+          github_url,
+          twitter_url,
+          website_url,
+          avatar_url,
+          is_approved,
+          created_at,
+          updated_at
+        `)
+        .eq('id', session.user.id)
+        .single();
+
+      if (fullError) {
+        console.log('Auth Helper: Some fields might be missing, using basic data:', fullError);
+        return basicUserData;
+      }
+
+      console.log('Auth Helper: User details found:', {
+        id: fullUserData?.id,
+        role: fullUserData?.role,
+        is_approved: fullUserData?.is_approved
+      });
+
+      return fullUserData;
+    } catch (error) {
+      console.log('Auth Helper: Error fetching full user details, using basic data:', error);
+      return basicUserData;
+    }
+  } catch (error) {
+    console.error('Auth Helper: Error in getServerUserDetails:', error);
+    return null;
+  }
 });
 
 // Client-side functions

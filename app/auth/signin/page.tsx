@@ -85,7 +85,15 @@ export default function SignInPage() {
     setIsLoading(true);
 
     try {
-      console.log('Attempting to sign in...');
+      console.log('Starting sign in process...');
+      
+      // First, check if there's already a session
+      const { data: existingSession } = await supabase.auth.getSession();
+      if (existingSession?.session) {
+        console.log('Existing session found, signing out first');
+        await supabase.auth.signOut();
+      }
+
       const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
@@ -125,32 +133,80 @@ export default function SignInPage() {
       }
 
       if (!authData.user) {
+        console.error('No user data returned from authentication');
         throw new Error("No user data found");
       }
 
       console.log('Authentication successful, checking user data...');
+      console.log('User ID:', authData.user.id);
+
+      // Verify session is set
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('Session after sign in:', {
+        exists: !!sessionData?.session,
+        userId: sessionData?.session?.user?.id
+      });
+
+      if (!sessionData?.session) {
+        throw new Error('Failed to establish session');
+      }
 
       // Get user role and approval status
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("role, is_approved")
+        .select("*")
         .eq("id", authData.user.id)
-        .maybeSingle();
+        .single();
 
       if (userError) {
         console.error('Error fetching user data:', userError);
         throw userError;
       }
 
-      // If no user data found, they might be a new signup
+      // If no user data found, create a profile
       if (!userData) {
-        console.log('No user profile found, redirecting to signup');
+        console.log('No user profile found, creating profile from auth data');
+        const userMetadata = authData.user.user_metadata;
+        
+        const profileData = {
+          id: authData.user.id,
+          email: authData.user.email,
+          name: userMetadata.name || authData.user.email?.split('@')[0] || 'User',
+          role: userMetadata.role || 'student',
+          department: userMetadata.department,
+          is_approved: true, // Set to true by default since they've already signed up
+          ...(userMetadata.role === 'alumni' ? {
+            graduation_year: userMetadata.year ? parseInt(userMetadata.year) : null
+          } : {
+            batch_year: userMetadata.year ? parseInt(userMetadata.year) : null
+          })
+        };
+
+        const { error: createError } = await supabase
+          .from('users')
+          .insert([profileData]);
+
+        if (createError) {
+          console.error('Error creating user profile:', createError);
+          throw createError;
+        }
+
+        console.log('Created new user profile');
+        
+        // Redirect to the appropriate dashboard instead of signup
+        const dashboardPath = `/${profileData.role}/dashboard`;
+        console.log('Redirecting to dashboard:', dashboardPath);
+        
         toast({
-          title: "Account setup incomplete",
-          description: "Please complete your profile setup.",
-          variant: "destructive",
+          title: "Profile created",
+          description: "Welcome to the platform!",
         });
-        router.push("/auth/signup");
+
+        // Small delay to ensure toast is shown
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Perform the redirect
+        window.location.href = dashboardPath;
         return;
       }
 
@@ -163,18 +219,24 @@ export default function SignInPage() {
       }
 
       console.log('User is approved, proceeding with sign in');
+      console.log('User role:', userData.role);
+      
+      // Redirect based on role
+      const dashboardPath = `/${userData.role}/dashboard`;
+      console.log('Redirecting to dashboard:', dashboardPath);
+
+      // Show success message before redirect
       toast({
         title: "Sign in successful",
         description: "Welcome back!",
       });
 
-      // Redirect based on role
-      const dashboardPath = `/${userData.role}/dashboard`;
-      console.log('Redirecting to dashboard:', dashboardPath);
-      router.push(dashboardPath);
-      
-      // Force a router refresh to ensure the middleware picks up the new session
-      router.refresh();
+      // Small delay to ensure toast is shown
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Perform the redirect
+      window.location.href = dashboardPath;
+
     } catch (error: any) {
       console.error("Sign in error:", error);
       toast({

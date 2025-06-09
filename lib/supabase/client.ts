@@ -1,9 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { type SupabaseClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
-export const createSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+let supabaseClient: SupabaseClient<Database> | null = null;
 
-  return createClient<Database>(supabaseUrl, supabaseAnonKey);
-};
+export function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClientComponentClient<Database>();
+  }
+  return supabaseClient;
+}
