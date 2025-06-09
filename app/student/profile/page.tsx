@@ -70,6 +70,12 @@ export default async function StudentProfilePage() {
                   <p className="text-sm text-muted-foreground">Batch Year</p>
                   <p className="font-medium">{userData.batch_year}</p>
                 </div>
+                {userData.roll_number && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Roll Number</p>
+                    <p className="font-medium">{userData.roll_number}</p>
+                  </div>
+                )}
                 {userData.graduation_year && (
                   <div>
                     <p className="text-sm text-muted-foreground">Graduation Year</p>
@@ -147,12 +153,18 @@ export default async function StudentProfilePage() {
                 </div>
               )}
               
-              {userData.bio && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Bio</p>
-                  <p className="mt-1">{userData.bio}</p>
-                </div>
-              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>About</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {userData.bio ? (
+                    <p className="text-muted-foreground">{userData.bio}</p>
+                  ) : (
+                    <p className="text-muted-foreground italic">No bio added yet.</p>
+                  )}
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </div>

@@ -14,6 +14,7 @@ export const profileSchema = z.object({
 
 export const studentProfileSchema = profileSchema.extend({
   batch_year: z.number().min(2000).max(new Date().getFullYear()),
+  roll_number: z.string().min(1, 'Roll number is required'),
   leetcode_url: z.string().url('Invalid URL').optional().nullable(),
   codechef_url: z.string().url('Invalid URL').optional().nullable(),
   codeforces_url: z.string().url('Invalid URL').optional().nullable(),

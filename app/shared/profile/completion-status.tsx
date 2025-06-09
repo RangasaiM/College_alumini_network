@@ -26,6 +26,7 @@ export function CompletionStatus({ role, profileData }: CompletionStatusProps) {
   const studentFields: ProfileField[] = [
     ...commonFields,
     { name: 'Batch Year', isComplete: !!profileData.batch_year },
+    { name: 'Roll Number', isComplete: !!profileData.roll_number },
     { name: 'Expected Graduation', isComplete: !!profileData.graduation_year },
     { name: 'GitHub Profile', isComplete: !!profileData.github_url },
     { name: 'LinkedIn Profile', isComplete: !!profileData.linkedin_url },

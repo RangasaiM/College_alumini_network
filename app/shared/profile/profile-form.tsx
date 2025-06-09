@@ -25,6 +25,7 @@ const formSchema = z.object({
   graduation_year: z.string().optional(),
   location: z.string().optional(),
   bio: z.string().optional(),
+  roll_number: z.string().optional(),
   skills: z.array(z.string()).default([]),
   github_url: z.string().url().optional().or(z.literal('')),
   linkedin_url: z.string().url().optional().or(z.literal('')),
@@ -110,6 +111,7 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
       graduation_year: initialData?.graduation_year?.toString() || '',
       location: initialData?.location || '',
       bio: initialData?.bio || '',
+      roll_number: initialData?.roll_number || '',
       skills: initialData?.skills || [],
       github_url: initialData?.github_url || '',
       linkedin_url: initialData?.linkedin_url || '',
@@ -257,6 +259,20 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                       <FormLabel>Batch Year</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="roll_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Roll Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -421,6 +437,24 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                     ))}
                   </div>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="bio"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bio</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Tell us about yourself..."
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </>
             ) : (
               <>
@@ -618,8 +652,8 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                       <FormControl>
                         <Textarea 
                           placeholder="Tell us about yourself..."
-                          className="min-h-[100px]"
-                          {...field} 
+                          className="resize-none"
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />

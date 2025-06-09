@@ -24,6 +24,7 @@ interface CompletionReminderProps {
     portfolio_url?: string;
     skills: string[];
     bio?: string;
+    roll_number?: string;
   } | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,7 +47,7 @@ export function CompletionReminder({
 
     // Calculate profile completion based on role
     const fields = userRole === 'student' 
-      ? ['github_url', 'linkedin_url', 'leetcode_url', 'codechef_url', 'codeforces_url', 'skills', 'bio'] as const
+      ? ['github_url', 'linkedin_url', 'leetcode_url', 'codechef_url', 'codeforces_url', 'skills', 'bio', 'roll_number'] as const
       : ['current_company', 'current_role', 'experience_years', 'linkedin_url', 'github_url', 'portfolio_url', 'skills', 'bio'] as const;
 
     const completedFields = fields.filter(field => {

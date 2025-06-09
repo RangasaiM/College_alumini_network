@@ -17,6 +17,7 @@ import {
   Settings,
   UserPlus,
   BarChart3,
+  MessageCircle,
 } from "lucide-react";
 import { useSupabase } from "@/components/providers/supabase-provider";
 
@@ -44,6 +45,11 @@ export function Sidebar({ role }: SidebarProps) {
       href: `/${role}/profile`,
       label: "Profile",
       icon: <User className="h-5 w-5" />,
+    },
+    {
+      href: "/posts",
+      label: "Posts",
+      icon: <MessageCircle className="h-5 w-5" />,
     },
     {
       href: `/${role}/connections`,
