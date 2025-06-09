@@ -2,6 +2,7 @@ import { getServerSupabase } from "@/lib/supabase/auth-helpers";
 import { CompletionStatus } from "@/app/shared/profile/completion-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ProfileAvatar } from "@/components/ui/profile-avatar";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -35,7 +36,22 @@ export default async function StudentProfilePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profile Completion Status */}
         <div className="md:col-span-1">
-          <CompletionStatus role="student" profileData={userData} />
+          <Card className="p-6">
+            <div className="flex flex-col items-center space-y-4">
+              <ProfileAvatar
+                avatarUrl={userData.avatar_url}
+                name={userData.name}
+                size="xl"
+              />
+              <div className="text-center">
+                <h2 className="text-xl font-semibold">{userData.name}</h2>
+                <p className="text-sm text-muted-foreground">{userData.email}</p>
+              </div>
+            </div>
+          </Card>
+          <div className="mt-6">
+            <CompletionStatus role="student" profileData={userData} />
+          </div>
         </div>
 
         {/* Profile Information */}
@@ -47,21 +63,25 @@ export default async function StudentProfilePage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{userData.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{userData.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Role</p>
-                  <p className="font-medium capitalize">{userData.role}</p>
+                  <p className="text-sm text-muted-foreground">Department</p>
+                  <p className="font-medium">{userData.department}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Batch Year</p>
                   <p className="font-medium">{userData.batch_year}</p>
                 </div>
+                {userData.graduation_year && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Graduation Year</p>
+                    <p className="font-medium">{userData.graduation_year}</p>
+                  </div>
+                )}
+                {userData.location && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium">{userData.location}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

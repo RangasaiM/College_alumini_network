@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,10 +15,12 @@ import { cn } from "@/lib/utils";
 import { updateProfile } from '@/app/actions/profile';
 import { toast } from 'sonner';
 import { X, Plus, Check } from 'lucide-react';
+import { AvatarUpload } from '@/components/ui/avatar-upload';
 
 const formSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  department: z.string(),
+  avatar_url: z.string().optional(),
+  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+  department: z.string().optional(),
   batch_year: z.string().optional(),
   graduation_year: z.string().optional(),
   location: z.string().optional(),
@@ -94,10 +96,14 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [isSkillPopoverOpen, setIsSkillPopoverOpen] = useState(false);
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const [hasImageChanged, setHasImageChanged] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      avatar_url: initialData?.avatar_url || '',
       name: initialData?.name || '',
       department: initialData?.department || '',
       batch_year: initialData?.batch_year?.toString() || '',
@@ -142,11 +148,21 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   };
 
   async function onSubmit(data: FormValues) {
+    if (isImageUploading) {
+      toast.error('Please wait for the image upload to complete');
+      return;
+    }
+
+    if (hasImageChanged && pendingImageUrl && data.avatar_url !== pendingImageUrl) {
+      data.avatar_url = pendingImageUrl;
+    }
+
     setIsLoading(true);
     try {
       const transformedData = {
         ...data,
         years_of_experience: data.years_of_experience ? parseInt(data.years_of_experience) : null,
+        updated_at: new Date().toISOString()
       };
 
       const result = await updateProfile(transformedData);
@@ -169,6 +185,38 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="avatar_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Profile Picture</FormLabel>
+              <FormControl>
+                <AvatarUpload
+                  userId={initialData?.id}
+                  url={hasImageChanged ? pendingImageUrl || field.value : field.value}
+                  onUploadComplete={(url) => {
+                    setPendingImageUrl(url);
+                    setHasImageChanged(true);
+                    setIsImageUploading(false);
+                  }}
+                  onUploadStart={() => {
+                    setIsImageUploading(true);
+                    setHasImageChanged(false);
+                  }}
+                  className="mb-4"
+                />
+              </FormControl>
+              <FormMessage />
+              {hasImageChanged && pendingImageUrl && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  New image uploaded. Click Save Changes to update your profile with the new image.
+                </p>
+              )}
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="name"
@@ -583,8 +631,12 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
           </>
         )}
 
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? 'Saving...' : 'Save Changes'}
+        <Button 
+          type="submit" 
+          disabled={isLoading || isImageUploading}
+          className="w-full"
+        >
+          {isLoading ? 'Saving...' : isImageUploading ? 'Uploading Image...' : 'Save Changes'}
         </Button>
       </form>
     </Form>

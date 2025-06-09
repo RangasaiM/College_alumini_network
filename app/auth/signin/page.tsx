@@ -38,6 +38,8 @@ type FormValues = z.infer<typeof formSchema>;
 export default function SignInPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -52,71 +54,189 @@ export default function SignInPage() {
     },
   });
 
+  const handleResendVerification = async (email: string) => {
+    try {
+      setIsLoading(true);
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+      
+      if (resendError) throw resendError;
+      
+      toast({
+        title: "Verification email sent",
+        description: "Please check your email (including spam folder) for the verification link.",
+      });
+      setShowVerification(false);
+    } catch (err) {
+      console.error('Error resending verification:', err);
+      toast({
+        title: "Error",
+        description: "Failed to resend verification email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   async function onSubmit(data: FormValues) {
     setIsLoading(true);
 
     try {
+      console.log('Starting sign in process...');
+      
+      // First, check if there's already a session
+      const { data: existingSession } = await supabase.auth.getSession();
+      if (existingSession?.session) {
+        console.log('Existing session found, signing out first');
+        await supabase.auth.signOut();
+      }
+
       const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Sign in error details:', error);
+        
+        // Handle specific error cases
+        if (error.message.includes('Email not confirmed')) {
+          setVerificationEmail(data.email);
+          setShowVerification(true);
+          toast({
+            title: "Email not verified",
+            description: "Please verify your email address before signing in.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (error.message.includes('Invalid login credentials')) {
+          toast({
+            title: "Invalid credentials",
+            description: "Please check your email and password and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Handle other errors
+        toast({
+          title: "Sign in failed",
+          description: error.message || "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       if (!authData.user) {
+        console.error('No user data returned from authentication');
         throw new Error("No user data found");
       }
 
-      // Add a small delay to ensure user data is available
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Authentication successful, checking user data...');
+      console.log('User ID:', authData.user.id);
+
+      // Verify session is set
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('Session after sign in:', {
+        exists: !!sessionData?.session,
+        userId: sessionData?.session?.user?.id
+      });
+
+      if (!sessionData?.session) {
+        throw new Error('Failed to establish session');
+      }
 
       // Get user role and approval status
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("role, is_approved")
+        .select("*")
         .eq("id", authData.user.id)
-        .maybeSingle();
+        .single();
 
-      if (userError) throw userError;
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        throw userError;
+      }
 
-      // If no user data found, they might be a new signup
+      // If no user data found, create a profile
       if (!userData) {
+        console.log('No user profile found, creating profile from auth data');
+        const userMetadata = authData.user.user_metadata;
+        
+        const profileData = {
+          id: authData.user.id,
+          email: authData.user.email,
+          name: userMetadata.name || authData.user.email?.split('@')[0] || 'User',
+          role: userMetadata.role || 'student',
+          department: userMetadata.department,
+          is_approved: true, // Set to true by default since they've already signed up
+          ...(userMetadata.role === 'alumni' ? {
+            graduation_year: userMetadata.year ? parseInt(userMetadata.year) : null
+          } : {
+            batch_year: userMetadata.year ? parseInt(userMetadata.year) : null
+          })
+        };
+
+        const { error: createError } = await supabase
+          .from('users')
+          .insert([profileData]);
+
+        if (createError) {
+          console.error('Error creating user profile:', createError);
+          throw createError;
+        }
+
+        console.log('Created new user profile');
+        
+        // Redirect to the appropriate dashboard instead of signup
+        const dashboardPath = `/${profileData.role}/dashboard`;
+        console.log('Redirecting to dashboard:', dashboardPath);
+        
         toast({
-          title: "Account setup incomplete",
-          description: "Please complete your profile setup.",
-          variant: "destructive",
+          title: "Profile created",
+          description: "Welcome to the platform!",
         });
-        router.push("/auth/signup");
+
+        // Small delay to ensure toast is shown
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Perform the redirect
+        window.location.href = dashboardPath;
         return;
       }
 
+      console.log('User data found:', userData);
+
       if (!userData.is_approved) {
+        console.log('User not approved, redirecting to pending approval');
         router.push("/pending-approval");
         return;
       }
 
+      console.log('User is approved, proceeding with sign in');
+      console.log('User role:', userData.role);
+      
+      // Redirect based on role
+      const dashboardPath = `/${userData.role}/dashboard`;
+      console.log('Redirecting to dashboard:', dashboardPath);
+
+      // Show success message before redirect
       toast({
         title: "Sign in successful",
         description: "Welcome back!",
       });
 
-      // Redirect based on role
-      switch (userData.role) {
-        case "admin":
-          router.push("/admin/dashboard");
-          break;
-        case "alumni":
-          router.push("/alumni/dashboard");
-          break;
-        case "student":
-          router.push("/student/dashboard");
-          break;
-        default:
-          router.push("/");
-      }
-      
-      // Force a router refresh to ensure the middleware picks up the new session
-      router.refresh();
+      // Small delay to ensure toast is shown
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Perform the redirect
+      window.location.href = dashboardPath;
+
     } catch (error: any) {
       console.error("Sign in error:", error);
       toast({
@@ -139,56 +259,83 @@ export default function SignInPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4"
-            >
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="you@example.com"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your password"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+          {showVerification ? (
+            <div className="space-y-4">
+              <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <h3 className="font-medium text-yellow-900 dark:text-yellow-100">
+                  Email Verification Required
+                </h3>
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
+                  We sent a verification link to {verificationEmail}. Please check your email (including spam folder) and click the link to verify your account.
+                </p>
+              </div>
               <Button
-                type="submit"
                 className="w-full"
+                onClick={() => handleResendVerification(verificationEmail)}
                 disabled={isLoading}
               >
-                {isLoading ? "Signing in..." : "Sign in"}
+                {isLoading ? "Sending..." : "Resend Verification Email"}
               </Button>
-            </form>
-          </Form>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowVerification(false)}
+              >
+                Back to Sign In
+              </Button>
+            </div>
+          ) : (
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+              >
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="you@example.com"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Enter your password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing in..." : "Sign in"}
+                </Button>
+              </form>
+            </Form>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <p className="text-center text-sm text-muted-foreground">
