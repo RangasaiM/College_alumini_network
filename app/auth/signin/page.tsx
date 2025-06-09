@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 import {
   Form,
@@ -44,7 +44,6 @@ export default function SignInPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -64,17 +63,14 @@ export default function SignInPage() {
       
       if (resendError) throw resendError;
       
-      toast({
-        title: "Verification email sent",
+      toast.success("Verification email sent", {
         description: "Please check your email (including spam folder) for the verification link.",
       });
       setShowVerification(false);
     } catch (err) {
       console.error('Error resending verification:', err);
-      toast({
-        title: "Error",
-        description: "Failed to resend verification email. Please try again.",
-        variant: "destructive",
+      toast.error("Failed to resend verification email", {
+        description: "Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -106,35 +102,32 @@ export default function SignInPage() {
         if (error.message.includes('Email not confirmed')) {
           setVerificationEmail(data.email);
           setShowVerification(true);
-          toast({
-            title: "Email not verified",
+          toast.error("Email not verified", {
             description: "Please verify your email address before signing in.",
-            variant: "destructive",
           });
           return;
         }
 
         if (error.message.includes('Invalid login credentials')) {
-          toast({
-            title: "Invalid credentials",
+          toast.error("Invalid credentials", {
             description: "Please check your email and password and try again.",
-            variant: "destructive",
           });
           return;
         }
 
         // Handle other errors
-        toast({
-          title: "Sign in failed",
+        toast.error("Sign in failed", {
           description: error.message || "An unexpected error occurred. Please try again.",
-          variant: "destructive",
         });
         return;
       }
 
       if (!authData.user) {
         console.error('No user data returned from authentication');
-        throw new Error("No user data found");
+        toast.error("Sign in failed", {
+          description: "No user account found. Please sign up first.",
+        });
+        return;
       }
 
       console.log('Authentication successful, checking user data...');
@@ -148,7 +141,10 @@ export default function SignInPage() {
       });
 
       if (!sessionData?.session) {
-        throw new Error('Failed to establish session');
+        toast.error("Session error", {
+          description: "Failed to establish session. Please try again.",
+        });
+        return;
       }
 
       // Get user role and approval status
@@ -160,6 +156,13 @@ export default function SignInPage() {
 
       if (userError) {
         console.error('Error fetching user data:', userError);
+        if (userError.code === 'PGRST116') {
+          toast.error("Account not found", {
+            description: "Please sign up first to create an account.",
+          });
+          router.push('/signup');
+          return;
+        }
         throw userError;
       }
 
@@ -188,7 +191,10 @@ export default function SignInPage() {
 
         if (createError) {
           console.error('Error creating user profile:', createError);
-          throw createError;
+          toast.error("Profile creation failed", {
+            description: "Failed to create your profile. Please try again.",
+          });
+          return;
         }
 
         console.log('Created new user profile');
@@ -197,8 +203,7 @@ export default function SignInPage() {
         const dashboardPath = `/${profileData.role}/dashboard`;
         console.log('Redirecting to dashboard:', dashboardPath);
         
-        toast({
-          title: "Profile created",
+        toast.success("Profile created", {
           description: "Welcome to the platform!",
         });
 
@@ -214,6 +219,9 @@ export default function SignInPage() {
 
       if (!userData.is_approved) {
         console.log('User not approved, redirecting to pending approval');
+        toast.info("Account pending approval", {
+          description: "Your account is waiting for admin approval.",
+        });
         router.push("/pending-approval");
         return;
       }
@@ -226,8 +234,7 @@ export default function SignInPage() {
       console.log('Redirecting to dashboard:', dashboardPath);
 
       // Show success message before redirect
-      toast({
-        title: "Sign in successful",
+      toast.success("Sign in successful", {
         description: "Welcome back!",
       });
 
@@ -239,10 +246,8 @@ export default function SignInPage() {
 
     } catch (error: any) {
       console.error("Sign in error:", error);
-      toast({
-        title: "Sign in failed",
+      toast.error("Sign in failed", {
         description: error.message || "Please check your credentials and try again.",
-        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
