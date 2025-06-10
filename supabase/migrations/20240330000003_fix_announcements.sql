@@ -8,6 +8,7 @@ CREATE TABLE public.announcements (
     content TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'general',
     target_roles TEXT[] NOT NULL DEFAULT ARRAY['all'],
+    target_role text NOT NULL DEFAULT 'all',
     created_by UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
@@ -42,4 +43,8 @@ CREATE TRIGGER update_announcements_timestamp
 
 -- Grant necessary permissions
 GRANT SELECT ON public.announcements TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.announcements TO authenticated; 
+GRANT INSERT, UPDATE, DELETE ON public.announcements TO authenticated;
+
+-- Add check constraint to ensure valid target_role values
+ALTER TABLE public.announcements 
+ADD CONSTRAINT valid_target_role CHECK (target_role IN ('all', 'student', 'alumni')); 

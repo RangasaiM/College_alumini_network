@@ -30,12 +30,29 @@ import {
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),
   content: z.string().min(1, { message: "Content is required" }),
-  target_role: z.enum(["all", "student", "alumni"], { required_error: "Target role is required" }),
+  target_role: z.enum(["all", "student", "alumni"], { required_error: "Target audience is required" }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function AnnouncementForm() {
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  target_role: string;
+  created_at: string;
+  user_id: string;
+  user?: {
+    name: string;
+    avatar_url: string;
+  };
+}
+
+interface AnnouncementFormProps {
+  onAnnouncementCreated?: (announcement: Announcement) => void;
+}
+
+export function AnnouncementForm({ onAnnouncementCreated }: AnnouncementFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createBrowserClient(
@@ -62,23 +79,40 @@ export function AnnouncementForm() {
         throw new Error('Not authenticated');
       }
 
-      const { error: insertError } = await supabase
+      const { data: newAnnouncement, error: insertError } = await supabase
         .from('announcements')
         .insert([
           {
             title: data.title,
             content: data.content,
             target_role: data.target_role,
-            created_by: session.user.id,
+            user_id: session.user.id,
           },
-        ]);
+        ])
+        .select(`
+          *,
+          user:users (
+            name,
+            avatar_url
+          )
+        `)
+        .single();
 
       if (insertError) {
         throw insertError;
       }
 
+      if (!newAnnouncement) {
+        throw new Error('Failed to create announcement');
+      }
+
       toast.success('Announcement created successfully');
       form.reset();
+      
+      if (onAnnouncementCreated) {
+        onAnnouncementCreated(newAnnouncement);
+      }
+      
       router.refresh();
     } catch (error: any) {
       console.error('Error creating announcement:', error);

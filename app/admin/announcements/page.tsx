@@ -1,25 +1,92 @@
-export const dynamic = 'force-dynamic';
+'use client';
 
-import { Suspense } from "react";
-import { getSession, getUserDetails } from "@/lib/supabase/auth-helpers";
-import { redirect } from "next/navigation";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnnouncementForm } from "./announcement-form";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AnnouncementsList } from "@/components/announcements/announcements-list";
+import { AdminAnnouncementsList } from "@/components/announcements/admin-announcements-list";
+import { createBrowserClient } from '@supabase/ssr';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-export default async function AnnouncementsPage() {
-  const session = await getSession();
-  
-  if (!session) {
-    redirect("/signin");
-  }
-  
-  const userDetails = await getUserDetails();
-  
-  if (!userDetails || userDetails.role !== "admin") {
-    redirect("/");
-  }
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  target_role: string;
+  created_at: string;
+  user_id: string;
+  user?: {
+    name: string;
+    avatar_url: string;
+  };
+}
+
+export default function AnnouncementsPage() {
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("announcements")
+        .select(`
+          *,
+          user:users (
+            name,
+            avatar_url
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setAnnouncements(data || []);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      toast.error('Failed to load announcements');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    checkSession();
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
+
+  const checkSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push("/signin");
+      return;
+    }
+
+    // Check if user is admin
+    const { data: userDetails } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!userDetails || userDetails.role !== 'admin') {
+      router.push("/");
+      return;
+    }
+  };
+
+  const handleAnnouncementCreated = (newAnnouncement: Announcement) => {
+    setAnnouncements(prev => [newAnnouncement, ...prev]);
+  };
+
+  const handleAnnouncementDeleted = (id: string) => {
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+  };
 
   return (
     <div className="space-y-6">
@@ -39,7 +106,7 @@ export default async function AnnouncementsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <AnnouncementForm userId={userDetails.id} />
+            <AnnouncementForm onAnnouncementCreated={handleAnnouncementCreated} />
           </CardContent>
         </Card>
         
@@ -51,9 +118,14 @@ export default async function AnnouncementsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Suspense fallback={<AnnouncementsLoadingSkeleton />}>
-              <AnnouncementsList limit={5} />
-            </Suspense>
+            {isLoading ? (
+              <AnnouncementsLoadingSkeleton />
+            ) : (
+              <AdminAnnouncementsList 
+                initialAnnouncements={announcements}
+                onAnnouncementDeleted={handleAnnouncementDeleted}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
