@@ -8,10 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConnectButton } from "@/app/shared/users/connect-button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Building2, GraduationCap, Briefcase, Link as LinkIcon, UserCheck, UserMinus, ThumbsUp, MessageSquare } from "lucide-react";
+import { MapPin, Building2, GraduationCap, Briefcase, Link as LinkIcon, UserCheck, UserMinus, ThumbsUp, MessageSquare, Mail, Linkedin, Github, Globe } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { Separator } from "@/components/ui/separator";
+import { Comments } from "@/app/shared/posts/comments";
 
 interface UserProfile {
   id: string;
@@ -31,6 +33,8 @@ interface UserProfile {
   portfolio_url?: string;
   avatar_url?: string;
   location?: string;
+  cover_image_url?: string;
+  previous_companies?: { name: string; position: string; duration: string }[];
 }
 
 interface RawPost {
@@ -71,6 +75,7 @@ export default function UserProfileView({ userId }: { userId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'accepted' | null>(null);
   const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [expandedComments, setExpandedComments] = useState<string[]>([]);
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -106,32 +111,33 @@ export default function UserProfileView({ userId }: { userId: string }) {
           .single();
 
         if (userError) throw userError;
-        setUser(userData);
 
         // Fetch user's posts
         const { data: postsData, error: postsError } = await supabase
           .from('posts')
           .select(`
             *,
-            user:users(id, name, avatar_url)
+            user:users(id, name, avatar_url, role, current_position, current_company)
           `)
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
 
         if (postsError) throw postsError;
 
-        // Fetch likes and comments for each post
+        // Fetch likes for the posts
         const { data: likesData } = await supabase
           .from('likes')
           .select('post_id, user_id')
           .in('post_id', postsData.map(p => p.id));
 
+        // Fetch comments for the posts
         const { data: commentsData } = await supabase
           .from('comments')
           .select('post_id')
           .in('post_id', postsData.map(p => p.id));
 
-        const processedPosts: Post[] = (postsData as RawPost[]).map(post => {
+        // Process posts with likes and comments data
+        const processedPosts = postsData.map(post => {
           const postLikes = likesData?.filter(like => like.post_id === post.id) || [];
           const postComments = commentsData?.filter(comment => comment.post_id === post.id) || [];
           
@@ -139,16 +145,16 @@ export default function UserProfileView({ userId }: { userId: string }) {
             ...post,
             likes_count: postLikes.length,
             comments_count: postComments.length,
-            has_liked: likesData?.some(like => like.post_id === post.id && like.user_id === session?.user.id) || false
+            has_liked: session ? postLikes.some(like => like.user_id === session.user.id) : false
           };
         });
 
+        setUser(userData);
         setPosts(processedPosts);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching user data:', error);
         toast.error('Error loading profile');
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -175,6 +181,54 @@ export default function UserProfileView({ userId }: { userId: string }) {
     } finally {
       setIsLoadingAction(false);
     }
+  };
+
+  const toggleComments = (postId: string) => {
+    setExpandedComments(prev => 
+      prev.includes(postId) 
+        ? prev.filter(id => id !== postId)
+        : [...prev, postId]
+    );
+  };
+
+  const handleLike = async (postId: string, hasLiked: boolean) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    if (hasLiked) {
+      await supabase
+        .from('likes')
+        .delete()
+        .match({ post_id: postId, user_id: session.user.id });
+    } else {
+      await supabase
+        .from('likes')
+        .insert([{ post_id: postId, user_id: session.user.id }]);
+    }
+
+    // Update the posts state to reflect the like change
+    setPosts(prevPosts => prevPosts.map(post => {
+      if (post.id === postId) {
+        return {
+          ...post,
+          has_liked: !hasLiked,
+          likes_count: hasLiked ? Number(post.likes_count) - 1 : Number(post.likes_count) + 1
+        };
+      }
+      return post;
+    }));
+  };
+
+  const handleCommentCountChange = (postId: string, count: number) => {
+    setPosts(prevPosts => prevPosts.map(post => {
+      if (post.id === postId) {
+        return {
+          ...post,
+          comments_count: count
+        };
+      }
+      return post;
+    }));
   };
 
   if (isLoading || !user) {
@@ -213,15 +267,22 @@ export default function UserProfileView({ userId }: { userId: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <div className="container py-6 space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Section */}
+        {/* Header Section with Cover Image */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <Card className="relative overflow-hidden">
-            <div className="h-48 bg-gradient-to-r from-primary/80 to-primary/40 relative overflow-hidden">
+            <div className="h-48 sm:h-64 bg-gradient-to-r from-primary/80 to-primary/40 relative overflow-hidden">
               <div className="absolute inset-0 bg-grid-white/10" />
+              {user.cover_image_url && (
+                <img
+                  src={user.cover_image_url}
+                  alt="Cover"
+                  className="w-full h-full object-cover"
+                />
+              )}
             </div>
             <CardContent className="relative -mt-24 space-y-4 p-6 sm:p-8">
               <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6">
@@ -250,6 +311,9 @@ export default function UserProfileView({ userId }: { userId: string }) {
                         <span>{user.department}</span>
                       </div>
                     )}
+                    <Badge variant="outline" className="capitalize">
+                      {user.role}
+                    </Badge>
                   </div>
                 </div>
                 <div className="mt-4 sm:mt-0 flex justify-center">
@@ -287,7 +351,7 @@ export default function UserProfileView({ userId }: { userId: string }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span className="h-6 w-1 bg-primary rounded-full" />
-                  Details
+                  Experience
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -298,12 +362,23 @@ export default function UserProfileView({ userId }: { userId: string }) {
                       <div>
                         <p className="font-medium">{user.current_company}</p>
                         <p className="text-sm text-muted-foreground">{user.current_position}</p>
+                        <p className="text-xs text-muted-foreground">{user.experience_years} years of experience</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                      <p>{user.experience_years} years of experience</p>
-                    </div>
+                    {user.previous_companies && (
+                      <div className="space-y-3">
+                        {user.previous_companies.map((company, index) => (
+                          <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                            <Building2 className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{company.name}</p>
+                              <p className="text-sm text-muted-foreground">{company.position}</p>
+                              <p className="text-xs text-muted-foreground">{company.duration}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
@@ -346,10 +421,16 @@ export default function UserProfileView({ userId }: { userId: string }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span className="h-6 w-1 bg-primary rounded-full" />
-                  Links
+                  Contact & Links
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {user.email && (
+                  <div className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50">
+                    <Mail className="h-4 w-4" />
+                    <span>{user.email}</span>
+                  </div>
+                )}
                 {user.linkedin_url && (
                   <a
                     href={user.linkedin_url}
@@ -357,7 +438,7 @@ export default function UserProfileView({ userId }: { userId: string }) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50"
                   >
-                    <LinkIcon className="h-4 w-4" />
+                    <Linkedin className="h-4 w-4" />
                     LinkedIn
                   </a>
                 )}
@@ -368,7 +449,7 @@ export default function UserProfileView({ userId }: { userId: string }) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50"
                   >
-                    <LinkIcon className="h-4 w-4" />
+                    <Github className="h-4 w-4" />
                     GitHub
                   </a>
                 )}
@@ -379,12 +460,9 @@ export default function UserProfileView({ userId }: { userId: string }) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50"
                   >
-                    <LinkIcon className="h-4 w-4" />
+                    <Globe className="h-4 w-4" />
                     Portfolio
                   </a>
-                )}
-                {(!user.linkedin_url && !user.github_url && !user.portfolio_url) && (
-                  <p className="text-muted-foreground">No links added yet.</p>
                 )}
               </CardContent>
             </Card>
@@ -441,16 +519,33 @@ export default function UserProfileView({ userId }: { userId: string }) {
                             className="rounded-lg max-h-96 w-full object-cover hover:opacity-95 transition-opacity cursor-pointer"
                           />
                         )}
+                        <Separator />
                         <div className="flex items-center gap-6 text-sm text-muted-foreground pt-2">
-                          <div className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer">
-                            <ThumbsUp className="h-4 w-4" />
-                            <span>{Number(post.likes_count) || 0} likes</span>
-                          </div>
-                          <div className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`gap-2 ${post.has_liked ? 'text-red-500 hover:text-red-600' : 'hover:text-primary'}`}
+                            onClick={() => handleLike(post.id, post.has_liked)}
+                          >
+                            <ThumbsUp className={`h-4 w-4 ${post.has_liked ? 'fill-current' : ''}`} />
+                            <span>{post.likes_count}</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`gap-2 ${expandedComments.includes(post.id) ? 'text-primary' : ''}`}
+                            onClick={() => toggleComments(post.id)}
+                          >
                             <MessageSquare className="h-4 w-4" />
-                            <span>{Number(post.comments_count) || 0} comments</span>
-                          </div>
+                            <span>{post.comments_count}</span>
+                          </Button>
                         </div>
+                        <Comments
+                          postId={post.id}
+                          isExpanded={expandedComments.includes(post.id)}
+                          onToggle={() => toggleComments(post.id)}
+                          onCommentCountChange={(count) => handleCommentCountChange(post.id, count)}
+                        />
                       </CardContent>
                     </Card>
                   ))
