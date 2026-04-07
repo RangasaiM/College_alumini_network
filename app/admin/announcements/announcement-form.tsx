@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ImageUpload } from "@/components/announcements/image-upload";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),
@@ -69,6 +70,8 @@ export function AnnouncementForm({ onAnnouncementCreated }: AnnouncementFormProp
     },
   });
 
+  const [images, setImages] = useState<string[]>([]);
+
   async function onSubmit(data: FormValues) {
     setIsLoading(true);
 
@@ -87,6 +90,7 @@ export function AnnouncementForm({ onAnnouncementCreated }: AnnouncementFormProp
             content: data.content,
             target_role: data.target_role,
             user_id: session.user.id,
+            images: images,
           },
         ])
         .select(`
@@ -108,11 +112,12 @@ export function AnnouncementForm({ onAnnouncementCreated }: AnnouncementFormProp
 
       toast.success('Announcement created successfully');
       form.reset();
-      
+      setImages([]);
+
       if (onAnnouncementCreated) {
         onAnnouncementCreated(newAnnouncement);
       }
-      
+
       router.refresh();
     } catch (error: any) {
       console.error('Error creating announcement:', error);
@@ -182,6 +187,13 @@ export function AnnouncementForm({ onAnnouncementCreated }: AnnouncementFormProp
             </FormItem>
           )}
         />
+
+
+
+        <div className="space-y-2">
+          <FormLabel>Images (Optional)</FormLabel>
+          <ImageUpload onImagesUploaded={setImages} />
+        </div>
 
         <Button type="submit" disabled={isLoading}>
           {isLoading ? "Creating..." : "Create Announcement"}

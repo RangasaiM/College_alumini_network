@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
+import { ConnectionActions } from "@/components/shared/connection-actions";
 
 interface UserDirectoryProps {
   filterRole?: "student" | "alumni";
@@ -12,39 +13,39 @@ interface UserDirectoryProps {
 
 export async function UserDirectory({ filterRole }: UserDirectoryProps) {
   const supabase = getServerSupabase();
-  
+
   // Get search parameters from URL
   let baseUrl = "http://localhost:3000";
   if (process.env.VERCEL_URL) {
     baseUrl = `https://${process.env.VERCEL_URL}`;
   }
-  
+
   const url = new URL(baseUrl);
   if (process.env.NEXT_PUBLIC_SITE_PATH) {
     url.pathname = process.env.NEXT_PUBLIC_SITE_PATH;
   }
-  
+
   const searchParams = url.searchParams;
   const query = searchParams.get("query");
   const year = searchParams.get("year");
   const skills = searchParams.get("skills")?.split(",").filter(Boolean);
   const role = searchParams.get("role") || filterRole;
-  
+
   // Build query
   let dbQuery = supabase
     .from("users")
     .select("*")
     .eq("is_approved", true);
-  
+
   // Apply filters
   if (role) {
     dbQuery = dbQuery.eq("role", role);
   }
-  
+
   if (query) {
     dbQuery = dbQuery.or(`name.ilike.%${query}%,current_job.ilike.%${query}%`);
   }
-  
+
   if (year) {
     if (role === "alumni") {
       dbQuery = dbQuery.eq("graduation_year", parseInt(year));
@@ -52,10 +53,10 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
       dbQuery = dbQuery.eq("batch_year", parseInt(year));
     }
   }
-  
+
   // Execute query
   const { data: users, error } = await dbQuery;
-  
+
   if (error) {
     console.error("Error fetching users:", error);
     return (
@@ -64,7 +65,7 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
       </div>
     );
   }
-  
+
   // Filter by skills if needed (client-side filtering since array fields are complex)
   let filteredUsers = users;
   if (skills && skills.length > 0) {
@@ -73,7 +74,7 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
       return skills.some((skill) => user.skills.includes(skill));
     });
   }
-  
+
   if (filteredUsers.length === 0) {
     return (
       <div className="text-center py-12">
@@ -120,19 +121,22 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
               <div>
                 <h3 className="font-semibold">{user.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {user.role === "alumni" 
-                    ? `${user.current_job || "Alumni"} ${user.graduation_year ? `• ${user.graduation_year}` : ""}`
-                    : `Student ${user.batch_year ? `• ${user.batch_year}` : ""}`}
+                  {user.role === "admin"
+                    ? "Administrator"
+                    : user.role === "alumni"
+                      ? `${user.current_job || "Alumni"} ${user.graduation_year ? `• ${user.graduation_year}` : ""}`
+                      : `Student ${user.batch_year ? `• ${user.batch_year}` : ""}`
+                  }
                 </p>
               </div>
             </div>
-            
+
             {user.is_mentorship_available && (
               <Badge className="mt-3" variant="outline">
                 Available for Mentorship
               </Badge>
             )}
-            
+
             <div className="mt-4">
               {user.skills && user.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-1 mt-2">
@@ -153,15 +157,10 @@ export async function UserDirectory({ filterRole }: UserDirectoryProps) {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between border-t p-4">
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href={`/profile/${user.id}`}>View Profile</Link>
             </Button>
-            <Button variant="secondary" size="icon" asChild>
-              <Link href={`/messages/new?recipient=${user.id}`}>
-                <MessageSquare className="h-4 w-4" />
-                <span className="sr-only">Message</span>
-              </Link>
-            </Button>
+            <ConnectionActions userId={user.id} />
           </CardFooter>
         </Card>
       ))}

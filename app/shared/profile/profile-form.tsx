@@ -2,12 +2,13 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,17 +21,17 @@ import { AvatarUpload } from '@/components/ui/avatar-upload';
 const formSchema = z.object({
   avatar_url: z.string().optional(),
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+  email: z.string().optional(),
+  mobile_number: z.string().optional(),
+  gender: z.string().optional(),
+  date_of_birth: z.string().optional(),
   department: z.string().optional(),
-  batch_year: z.string().optional(),
   graduation_year: z.string().optional(),
-  location: z.string().optional(),
   bio: z.string().optional(),
   roll_number: z.string().optional(),
   skills: z.array(z.string()).default([]),
   github_url: z.string().url().optional().or(z.literal('')),
   linkedin_url: z.string().url().optional().or(z.literal('')),
-  twitter_url: z.string().url().optional().or(z.literal('')),
-  website_url: z.string().url().optional().or(z.literal('')),
   leetcode_url: z.string().url().optional().or(z.literal('')),
   codechef_url: z.string().url().optional().or(z.literal('')),
   hackerrank_url: z.string().url().optional().or(z.literal('')),
@@ -54,6 +55,7 @@ const formSchema = z.object({
       name: z.string(),
       issuer: z.string(),
       date: z.string(),
+      url: z.string().url().optional().or(z.literal('')),
     })
   ).optional(),
   academic_achievements: z.array(z.string()).optional(),
@@ -61,7 +63,6 @@ const formSchema = z.object({
   career_goals: z.string().optional(),
   current_company: z.string().optional(),
   current_position: z.string().optional(),
-  years_of_experience: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -106,17 +107,17 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
     defaultValues: {
       avatar_url: initialData?.avatar_url || '',
       name: initialData?.name || '',
+      email: initialData?.email || '',
+      mobile_number: initialData?.mobile_number || '',
+      gender: initialData?.gender || '',
+      date_of_birth: initialData?.date_of_birth || '',
       department: initialData?.department || '',
-      batch_year: initialData?.batch_year?.toString() || '',
       graduation_year: initialData?.graduation_year?.toString() || '',
-      location: initialData?.location || '',
       bio: initialData?.bio || '',
       roll_number: initialData?.roll_number || '',
       skills: initialData?.skills || [],
       github_url: initialData?.github_url || '',
       linkedin_url: initialData?.linkedin_url || '',
-      twitter_url: initialData?.twitter_url || '',
-      website_url: initialData?.website_url || '',
       leetcode_url: initialData?.leetcode_url || '',
       codechef_url: initialData?.codechef_url || '',
       hackerrank_url: initialData?.hackerrank_url || '',
@@ -129,8 +130,17 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
       career_goals: initialData?.career_goals || '',
       current_company: initialData?.current_company || '',
       current_position: initialData?.current_position || '',
-      years_of_experience: initialData?.years_of_experience?.toString() || ''
     },
+  });
+
+  const { fields: internshipFields, append: appendInternship, remove: removeInternship } = useFieldArray({
+    control: form.control,
+    name: "internships"
+  });
+
+  const { fields: certificationFields, append: appendCertification, remove: removeCertification } = useFieldArray({
+    control: form.control,
+    name: "certifications"
   });
 
   const addSkill = (skillToAdd: string) => {
@@ -163,7 +173,6 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
     try {
       const transformedData = {
         ...data,
-        years_of_experience: data.years_of_experience ? parseInt(data.years_of_experience) : null,
         updated_at: new Date().toISOString()
       };
 
@@ -171,7 +180,7 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
       if (!result.success) {
         throw new Error('Failed to update profile');
       }
-      
+
       toast.success('Profile updated successfully');
       const profileRoute = userRole === 'alumni' ? '/alumni/profile' : '/student/profile';
       router.push(profileRoute);
@@ -233,8 +242,87 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
           )}
         />
 
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input {...field} disabled />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="mobile_number"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Mobile Number</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="+91 9876543210" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="gender"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Gender</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="date_of_birth"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Date of Birth</FormLabel>
+              <FormControl>
+                <Input {...field} type="date" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {userRole !== 'admin' && (
           <>
+            <FormField
+              control={form.control}
+              name="roll_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Roll Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Enter your roll number" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="department"
@@ -242,7 +330,22 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                 <FormItem>
                   <FormLabel>Department</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} disabled />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="graduation_year"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Graduation Year</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="number" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -251,33 +354,6 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
 
             {userRole === 'student' ? (
               <>
-                <FormField
-                  control={form.control}
-                  name="batch_year"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Batch Year</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="roll_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Roll Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Coding Profiles</h3>
@@ -445,7 +521,7 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                     <FormItem>
                       <FormLabel>Bio</FormLabel>
                       <FormControl>
-                        <Textarea 
+                        <Textarea
                           placeholder="Tell us about yourself..."
                           className="resize-none"
                           {...field}
@@ -486,32 +562,6 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="years_of_experience"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Years of Experience</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="0" step="1" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
 
                 <div className="space-y-4">
@@ -537,32 +587,6 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                         <FormLabel>LinkedIn URL</FormLabel>
                         <FormControl>
                           <Input type="url" placeholder="https://linkedin.com/in/yourusername" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="twitter_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Twitter URL</FormLabel>
-                        <FormControl>
-                          <Input type="url" placeholder="https://twitter.com/yourusername" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="website_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Personal Website</FormLabel>
-                        <FormControl>
-                          <Input type="url" placeholder="https://yourwebsite.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -650,7 +674,7 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                     <FormItem>
                       <FormLabel>Bio</FormLabel>
                       <FormControl>
-                        <Textarea 
+                        <Textarea
                           placeholder="Tell us about yourself..."
                           className="resize-none"
                           {...field}
@@ -662,17 +686,134 @@ export function ProfileForm({ userRole, initialData }: ProfileFormProps) {
                 />
               </>
             )}
+
+            <div className="space-y-8 pt-6 border-t mt-6">
+              {/* Experience Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Experience</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendInternship({ company: '', position: '', duration: '' })}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Experience
+                  </Button>
+                </div>
+                {internshipFields.map((field, index) => (
+                  <div key={field.id} className="p-4 border rounded-lg space-y-4 relative bg-muted/20">
+                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeInternship(index)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name={`internships.${index}.position`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Position / Role</FormLabel>
+                            <FormControl><Input {...field} placeholder="Software Engineer" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`internships.${index}.company`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company</FormLabel>
+                            <FormControl><Input {...field} placeholder="Acme Corp" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`internships.${index}.duration`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Duration</FormLabel>
+                            <FormControl><Input {...field} placeholder="Jan 2023 - Present" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Certifications Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Licenses & Certifications</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendCertification({ name: '', issuer: '', date: '' })}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Certification
+                  </Button>
+                </div>
+                {certificationFields.map((field, index) => (
+                  <div key={field.id} className="p-4 border rounded-lg space-y-4 relative bg-muted/20">
+                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeCertification(index)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name={`certifications.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl><Input {...field} placeholder="Certification Name" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`certifications.${index}.issuer`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Issuing Organization</FormLabel>
+                            <FormControl><Input {...field} placeholder="Coursera, AWS" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`certifications.${index}.date`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Issue Date</FormLabel>
+                            <FormControl><Input {...field} placeholder="Jan 2024" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`certifications.${index}.url`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Credential URL</FormLabel>
+                            <FormControl><Input {...field} placeholder="https://..." /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
 
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           disabled={isLoading || isImageUploading}
           className="w-full"
         >
           {isLoading ? 'Saving...' : isImageUploading ? 'Uploading Image...' : 'Save Changes'}
         </Button>
       </form>
-    </Form>
+    </Form >
   );
 }

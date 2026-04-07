@@ -41,7 +41,18 @@ export function CompletionStatus({ role, profileData }: CompletionStatusProps) {
     { name: 'LinkedIn Profile', isComplete: !!profileData.linkedin_url },
   ];
 
-  const fields = role === 'student' ? studentFields : alumniFields;
+  const adminFields: ProfileField[] = [
+    { name: 'Name', isComplete: !!profileData.name },
+    { name: 'Department', isComplete: !!profileData.department },
+    { name: 'Mobile Number', isComplete: !!profileData.mobile_number },
+    { name: 'LinkedIn Profile', isComplete: !!profileData.linkedin_url },
+  ];
+
+  let fields: ProfileField[] = [];
+  if (role === 'student') fields = studentFields;
+  else if (role === 'alumni') fields = alumniFields;
+  else if (role === 'admin') fields = adminFields;
+
   const completedFields = fields.filter(field => field.isComplete).length;
   const completionPercentage = (completedFields / fields.length) * 100;
 
@@ -57,7 +68,7 @@ export function CompletionStatus({ role, profileData }: CompletionStatusProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <Progress value={completionPercentage} className="h-2" />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {fields.map((field, index) => (
             <div key={index} className="flex items-center gap-2 text-sm">

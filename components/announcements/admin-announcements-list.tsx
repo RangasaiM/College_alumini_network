@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Trash2 } from "lucide-react";
+import Image from "next/image";
 
 interface Announcement {
   id: string;
@@ -29,6 +31,7 @@ interface Announcement {
     name: string;
     avatar_url: string;
   };
+  images?: string[] | null;
 }
 
 interface AdminAnnouncementsListProps {
@@ -36,7 +39,7 @@ interface AdminAnnouncementsListProps {
   onAnnouncementDeleted?: (id: string) => void;
 }
 
-export function AdminAnnouncementsList({ 
+export function AdminAnnouncementsList({
   initialAnnouncements,
   onAnnouncementDeleted
 }: AdminAnnouncementsListProps) {
@@ -87,51 +90,75 @@ export function AdminAnnouncementsList({
       {announcements.map((announcement) => (
         <div
           key={announcement.id}
-          className="p-4 rounded-lg border bg-card text-card-foreground shadow-sm"
+          className="group flex flex-col sm:flex-row gap-4 p-4 rounded-lg border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all"
         >
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h3 className="font-semibold leading-none tracking-tight">
-                {announcement.title}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {format(new Date(announcement.created_at), 'PPpp')}
+          {announcement.images && announcement.images.length > 0 && (
+            <div className="relative w-full sm:w-32 h-48 sm:h-24 shrink-0 rounded-md overflow-hidden bg-muted">
+              <Image
+                src={announcement.images[0]}
+                alt={announcement.title}
+                fill
+                className="object-cover transition-transform group-hover:scale-105"
+              />
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-lg leading-tight line-clamp-1">
+                  {announcement.title}
+                </h3>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive -mt-1 -mr-2 shrink-0"
+                      disabled={deletingId === announcement.id}
+                    >
+                      {deletingId === announcement.id ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Announcement?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete "{announcement.title}".
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete(announcement.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+
+              <p className="text-xs text-muted-foreground mb-1">
+                {format(new Date(announcement.created_at), 'PPP')}
+              </p>
+
+              <p className="text-sm text-foreground/80 line-clamp-2">
+                {announcement.content}
               </p>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={deletingId === announcement.id}
-                >
-                  {deletingId === announcement.id ? "Deleting..." : "Delete"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the
-                    announcement.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleDelete(announcement.id)}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-          <p className="mt-2 text-sm">{announcement.content}</p>
-          <div className="mt-2">
-            <Badge variant="secondary">
-              Target: {announcement.target_role}
-            </Badge>
+
+            <div className="flex items-center gap-2">
+              <Badge variant={announcement.target_role === 'all' ? 'default' : 'outline'} className="capitalize">
+                {announcement.target_role === 'all' ? 'Everyone' : announcement.target_role}
+              </Badge>
+            </div>
           </div>
         </div>
       ))}

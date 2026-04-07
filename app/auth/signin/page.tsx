@@ -60,9 +60,9 @@ export default function SignInPage() {
         type: 'signup',
         email: email,
       });
-      
+
       if (resendError) throw resendError;
-      
+
       toast.success("Verification email sent", {
         description: "Please check your email (including spam folder) for the verification link.",
       });
@@ -82,7 +82,7 @@ export default function SignInPage() {
 
     try {
       console.log('Starting sign in process...');
-      
+
       // First, check if there's already a session
       const { data: existingSession } = await supabase.auth.getSession();
       if (existingSession?.session) {
@@ -97,7 +97,7 @@ export default function SignInPage() {
 
       if (error) {
         console.error('Sign in error details:', error);
-        
+
         // Handle specific error cases
         if (error.message.includes('Email not confirmed')) {
           setVerificationEmail(data.email);
@@ -170,7 +170,7 @@ export default function SignInPage() {
       if (!userData) {
         console.log('No user profile found, creating profile from auth data');
         const userMetadata = authData.user.user_metadata;
-        
+
         const profileData = {
           id: authData.user.id,
           email: authData.user.email,
@@ -198,11 +198,11 @@ export default function SignInPage() {
         }
 
         console.log('Created new user profile');
-        
+
         // Redirect to the appropriate dashboard instead of signup
         const dashboardPath = `/${profileData.role}/dashboard`;
         console.log('Redirecting to dashboard:', dashboardPath);
-        
+
         toast.success("Profile created", {
           description: "Welcome to the platform!",
         });
@@ -228,7 +228,7 @@ export default function SignInPage() {
 
       console.log('User is approved, proceeding with sign in');
       console.log('User role:', userData.role);
-      
+
       // Redirect based on role
       const dashboardPath = `/${userData.role}/dashboard`;
       console.log('Redirecting to dashboard:', dashboardPath);

@@ -1,0 +1,13 @@
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS roll_number TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS twitter_url TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS codechef_url TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS hackerrank_url TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS codeforces_url TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS internships JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS projects JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS certifications JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS academic_achievements TEXT[] DEFAULT '{}';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS areas_of_interest TEXT[] DEFAULT '{}';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS career_goals TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS location TEXT;

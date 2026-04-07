@@ -1,560 +1,517 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ConnectButton } from "@/app/shared/users/connect-button";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Building2, GraduationCap, Briefcase, Link as LinkIcon, UserCheck, UserMinus, ThumbsUp, MessageSquare, Mail, Linkedin, Github, Globe } from "lucide-react";
-import { formatDistanceToNow } from 'date-fns';
-import { toast } from 'sonner';
-import { motion } from 'framer-motion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  MapPin, Briefcase, GraduationCap, Mail, Phone, Calendar,
+  Award, BookOpen, Link as LinkIcon, Github, Linkedin,
+  Twitter, Globe, MessageSquare, UserPlus, FileText, Check, UserCheck, ExternalLink
+} from "lucide-react";
+import Link from "next/link";
+import { createBrowserClient } from "@supabase/ssr";
+import { PostCard } from "@/app/shared/posts/post-card";
 import { Separator } from "@/components/ui/separator";
-import { Comments } from "@/app/shared/posts/comments";
+import { ConnectionsView } from "@/components/connections/connections-view";
+import { toast } from "sonner";
 
-interface UserProfile {
-  id: string;
-  name: string;
-  email: string;
-  role: 'student' | 'alumni' | 'admin';
-  department?: string;
-  batch_year?: number;
-  graduation_year?: number;
-  current_company?: string;
-  current_position?: string;
-  experience_years?: number;
-  bio?: string;
-  skills?: string[];
-  github_url?: string;
-  linkedin_url?: string;
-  portfolio_url?: string;
-  avatar_url?: string;
-  location?: string;
-  cover_image_url?: string;
-  previous_companies?: { name: string; position: string; duration: string }[];
+// ... (existing helper function)
+
+interface UserProfileViewProps {
+  user: any;
+  currentUser: any;
+  isOwnProfile?: boolean;
+  connectionCount?: number;
 }
 
-interface RawPost {
-  id: string;
-  content: string;
-  image_url: string | null;
-  created_at: string;
-  user_id: string;
-  user: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-  };
-  likes_count: number | { count: number }[];
-  comments_count: number | { count: number }[];
-}
-
-interface Post {
-  id: string;
-  content: string;
-  image_url: string | null;
-  created_at: string;
-  user_id: string;
-  user: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-  };
-  likes_count: number;
-  comments_count: number;
-  has_liked: boolean;
-}
-
-export default function UserProfileView({ userId }: { userId: string }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'accepted' | null>(null);
-  const [isLoadingAction, setIsLoadingAction] = useState(false);
-  const [expandedComments, setExpandedComments] = useState<string[]>([]);
+export function UserProfileView({ user, currentUser, isOwnProfile = false, connectionCount = 0 }: UserProfileViewProps) {
+  const [userPosts, setUserPosts] = useState<any[]>([]);
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  const [connectionStatus, setConnectionStatus] = useState<'sent' | 'received' | 'pending' | 'accepted' | null>(null);
+
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        // Get current user session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setCurrentUserId(session.user.id);
+    const fetchConnectionStatus = async () => {
+      if (!currentUser?.id || !user?.id) return;
 
-          // Check connection status
-          const { data: connectionData } = await supabase
-            .from('connections')
-            .select('*')
-            .or(`and(requester_id.eq.${session.user.id},receiver_id.eq.${userId}),and(requester_id.eq.${userId},receiver_id.eq.${session.user.id})`)
-            .single();
+      const { data } = await supabase
+        .from('connections')
+        .select('*')
+        .or(`and(requester_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(requester_id.eq.${user.id},receiver_id.eq.${currentUser.id})`)
+        .single();
 
-          if (connectionData) {
-            setConnectionStatus(connectionData.status);
-          } else {
-            setConnectionStatus('none');
-          }
+      if (data) {
+        if (data.status === 'pending') {
+          setConnectionStatus(data.requester_id === currentUser.id ? 'sent' : 'received');
+        } else {
+          setConnectionStatus(data.status);
         }
-
-        // Fetch user profile
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (userError) throw userError;
-
-        // Fetch user's posts
-        const { data: postsData, error: postsError } = await supabase
-          .from('posts')
-          .select(`
-            *,
-            user:users(id, name, avatar_url, role, current_position, current_company)
-          `)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (postsError) throw postsError;
-
-        // Fetch likes for the posts
-        const { data: likesData } = await supabase
-          .from('likes')
-          .select('post_id, user_id')
-          .in('post_id', postsData.map(p => p.id));
-
-        // Fetch comments for the posts
-        const { data: commentsData } = await supabase
-          .from('comments')
-          .select('post_id')
-          .in('post_id', postsData.map(p => p.id));
-
-        // Process posts with likes and comments data
-        const processedPosts = postsData.map(post => {
-          const postLikes = likesData?.filter(like => like.post_id === post.id) || [];
-          const postComments = commentsData?.filter(comment => comment.post_id === post.id) || [];
-          
-          return {
-            ...post,
-            likes_count: postLikes.length,
-            comments_count: postComments.length,
-            has_liked: session ? postLikes.some(like => like.user_id === session.user.id) : false
-          };
-        });
-
-        setUser(userData);
-        setPosts(processedPosts);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        toast.error('Error loading profile');
       }
     };
 
-    fetchUserData();
-  }, [userId, supabase]);
+    fetchConnectionStatus();
+  }, [currentUser?.id, user.id, supabase]);
 
-  const handleRemoveConnection = async () => {
-    if (!currentUserId || !user) return;
-    
+  const handleConnect = async () => {
     try {
-      setIsLoadingAction(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please sign in to connect');
+        return;
+      }
+
       const { error } = await supabase
         .from('connections')
-        .delete()
-        .or(`and(requester_id.eq.${currentUserId},receiver_id.eq.${userId}),and(requester_id.eq.${userId},receiver_id.eq.${currentUserId})`);
+        .insert([
+          {
+            requester_id: session.user.id,
+            receiver_id: user.id,
+            status: 'pending'
+          }
+        ]);
 
       if (error) throw error;
 
-      setConnectionStatus('none');
-      toast.success('Connection removed successfully');
+      toast.success('Connection request sent');
+      setConnectionStatus('sent');
     } catch (error) {
-      console.error('Error removing connection:', error);
-      toast.error('Failed to remove connection');
-    } finally {
-      setIsLoadingAction(false);
+      console.error('Error sending connection request:', error);
+      toast.error('Failed to send connection request');
     }
   };
 
-  const toggleComments = (postId: string) => {
-    setExpandedComments(prev => 
-      prev.includes(postId) 
-        ? prev.filter(id => id !== postId)
-        : [...prev, postId]
-    );
-  };
+  useEffect(() => {
+    const fetchUserPosts = async () => {
+      if (!user?.id) return;
 
-  const handleLike = async (postId: string, hasLiked: boolean) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+      const { data: postsData } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          user:users!posts_user_id_fkey(id, name, avatar_url, role, current_position, current_company)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (hasLiked) {
-      await supabase
-        .from('likes')
-        .delete()
-        .match({ post_id: postId, user_id: session.user.id });
-    } else {
-      await supabase
-        .from('likes')
-        .insert([{ post_id: postId, user_id: session.user.id }]);
-    }
+      if (postsData) {
+        const postIds = postsData.map(p => p.id);
+        const { data: likesData } = await supabase.from('likes').select('post_id, user_id').in('post_id', postIds);
+        const { data: commentsData } = await supabase.from('comments').select('post_id').in('post_id', postIds);
 
-    // Update the posts state to reflect the like change
-    setPosts(prevPosts => prevPosts.map(post => {
-      if (post.id === postId) {
-        return {
+        const processed = postsData.map(post => ({
           ...post,
-          has_liked: !hasLiked,
-          likes_count: hasLiked ? Number(post.likes_count) - 1 : Number(post.likes_count) + 1
-        };
+          user: post.user || {
+            id: user.id,
+            name: user.name,
+            avatar_url: user.avatar_url,
+            role: user.role,
+            current_position: user.current_position,
+            current_company: user.current_company
+          },
+          likes_count: likesData?.filter(l => l.post_id === post.id).length || 0,
+          comments_count: commentsData?.filter(c => c.post_id === post.id).length || 0,
+          has_liked: likesData?.some(l => l.post_id === post.id && l.user_id === currentUser?.id) || false
+        }));
+        setUserPosts(processed);
       }
-      return post;
-    }));
+    };
+
+    fetchUserPosts();
+  }, [user.id, currentUser?.id]);
+
+  // Mock data for missing DB fields to demonstrate the UI
+  const coverImage = "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2070&auto=format&fit=crop";
+  const stats = {
+    connections: connectionCount,
+    posts: 0,
+    views: 45
   };
 
-  const handleCommentCountChange = (postId: string, count: number) => {
-    setPosts(prevPosts => prevPosts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          comments_count: count
-        };
-      }
-      return post;
-    }));
-  };
-
-  if (isLoading || !user) {
-    return <div>Loading...</div>;
-  }
-
-  const renderConnectionButton = () => {
-    if (currentUserId === user.id) return null;
-
-    switch (connectionStatus) {
-      case 'accepted':
-        return (
-          <Button
-            variant="outline"
-            onClick={handleRemoveConnection}
-            disabled={isLoadingAction}
-            className="space-x-2"
-          >
-            <UserCheck className="h-4 w-4" />
-            <span>Connected</span>
-          </Button>
-        );
-      case 'pending':
-        return (
-          <Button variant="outline" disabled className="space-x-2">
-            <Badge variant="secondary">Request Pending</Badge>
-          </Button>
-        );
-      case 'none':
-        return <ConnectButton userId={user.id} userName={user.name} />;
-      default:
-        return null;
+  const experience = user.internships || [];
+  const education = [
+    {
+      school: "ACE Engineering College, Ghatkesar",
+      degree: "Bachelor of Technology",
+      field: user.department || "Computer Science",
+      start: user.graduation_year ? (user.graduation_year - 4).toString() : "2020",
+      end: user.graduation_year || "2024"
     }
-  };
+  ];
+
+  const skills = user.skills || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <div className="container py-6 space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Section with Cover Image */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Card className="relative overflow-hidden">
-            <div className="h-48 sm:h-64 bg-gradient-to-r from-primary/80 to-primary/40 relative overflow-hidden">
-              <div className="absolute inset-0 bg-grid-white/10" />
-              {user.cover_image_url && (
-                <img
-                  src={user.cover_image_url}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                />
-              )}
-            </div>
-            <CardContent className="relative -mt-24 space-y-4 p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6">
-                <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-primary/50 mx-auto sm:mx-0">
-                  {user.avatar_url ? (
-                    <AvatarImage src={user.avatar_url} alt={user.name} />
-                  ) : (
-                    <AvatarFallback className="text-4xl">{user.name?.charAt(0)}</AvatarFallback>
-                  )}
+    <div className="max-w-5xl mx-auto space-y-6 pb-10">
+
+      {/* Header Card - Hero Section */}
+      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+        {/* Cover Image */}
+        <div className="h-48 md:h-64 w-full relative bg-muted">
+          <img
+            src={coverImage}
+            alt="Cover"
+            className="w-full h-full object-cover"
+          />
+          {isOwnProfile && (
+            <Button variant="secondary" size="sm" className="absolute top-4 right-4 opacity-90 hover:opacity-100">
+              Edit Cover
+            </Button>
+          )}
+        </div>
+
+        <div className="px-6 pb-6 relative">
+          {/* Profile Header Content */}
+          <div className="flex flex-col md:flex-row items-start md:items-end -mt-16 mb-4 gap-6">
+            {/* Avatar */}
+            <div className="relative">
+              <div className="rounded-full p-1.5 bg-card">
+                <Avatar className="h-32 w-32 border-2 border-muted">
+                  <AvatarImage src={user.avatar_url || ""} />
+                  <AvatarFallback className="text-4xl bg-primary/10 text-primary">
+                    {user.name?.[0]?.toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="mt-4 sm:mt-0 text-center sm:text-left flex-1">
-                  <h1 className="text-2xl sm:text-3xl font-bold">{user.name}</h1>
-                  <p className="text-xl text-muted-foreground mt-1">
-                    {user.current_position} {user.current_company && `at ${user.current_company}`}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 mt-3 justify-center sm:justify-start text-sm text-muted-foreground">
-                    {user.location && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{user.location}</span>
-                      </div>
-                    )}
-                    {user.department && (
-                      <div className="flex items-center gap-1">
-                        <GraduationCap className="h-4 w-4" />
-                        <span>{user.department}</span>
-                      </div>
-                    )}
-                    <Badge variant="outline" className="capitalize">
-                      {user.role}
-                    </Badge>
+              </div>
+            </div>
+
+            {/* Main Info */}
+            <div className="flex-1 mt-2 md:mt-0 md:mb-2 space-y-1">
+              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                {user.name}
+                {user.role === 'alumni' && <Badge variant="secondary" className="text-xs">Alumni</Badge>}
+                {user.role === 'admin' && <Badge variant="destructive" className="text-xs">Admin</Badge>}
+              </h1>
+              <p className="text-lg text-muted-foreground font-medium">
+                {user.current_position ? `${user.current_position} at ${user.current_company}` : user.role === 'student' ? 'Student' : 'Professional'}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                {user.location && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    {user.location}
                   </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <GraduationCap className="h-4 w-4" />
+                  {user.department || 'N/A'}{user.graduation_year ? ` • ${user.graduation_year}` : ''}
                 </div>
-                <div className="mt-4 sm:mt-0 flex justify-center">
-                  {renderConnectionButton()}
+                <div className="text-primary font-medium hover:underline cursor-pointer">
+                  {stats.connections} connections
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - About and Details */}
-          <motion.div
-            className="space-y-6"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="h-6 w-1 bg-primary rounded-full" />
-                  About
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
-                  {user.bio || 'No bio added yet.'}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="h-6 w-1 bg-primary rounded-full" />
-                  Experience
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {user.role === 'alumni' ? (
-                  <>
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                      <Building2 className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">{user.current_company}</p>
-                        <p className="text-sm text-muted-foreground">{user.current_position}</p>
-                        <p className="text-xs text-muted-foreground">{user.experience_years} years of experience</p>
-                      </div>
-                    </div>
-                    {user.previous_companies && (
-                      <div className="space-y-3">
-                        {user.previous_companies.map((company, index) => (
-                          <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                            <Building2 className="h-5 w-5 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium">{company.name}</p>
-                              <p className="text-sm text-muted-foreground">{company.position}</p>
-                              <p className="text-xs text-muted-foreground">{company.duration}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                    <GraduationCap className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="font-medium">Batch of {user.batch_year}</p>
-                      <p className="text-sm text-muted-foreground">{user.department}</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="h-6 w-1 bg-primary rounded-full" />
-                  Skills
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {user.skills?.map((skill, index) => (
-                    <Badge 
-                      key={index} 
-                      variant="secondary"
-                      className="px-3 py-1 hover:bg-secondary/80 transition-colors"
-                    >
-                      {skill}
-                    </Badge>
-                  ))}
-                  {(!user.skills || user.skills.length === 0) && (
-                    <p className="text-muted-foreground">No skills added yet.</p>
-                  )}
+              {user.bio && (
+                <div className="mt-4 max-w-3xl">
+                  <p className="text-muted-foreground/90 whitespace-pre-wrap leading-relaxed text-sm md:text-base">
+                    {user.bio}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
 
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow duration-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="h-6 w-1 bg-primary rounded-full" />
-                  Contact & Links
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {user.email && (
-                  <div className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50">
-                    <Mail className="h-4 w-4" />
-                    <span>{user.email}</span>
-                  </div>
-                )}
-                {user.linkedin_url && (
-                  <a
-                    href={user.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50"
-                  >
-                    <Linkedin className="h-4 w-4" />
-                    LinkedIn
-                  </a>
-                )}
-                {user.github_url && (
-                  <a
-                    href={user.github_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50"
-                  >
-                    <Github className="h-4 w-4" />
-                    GitHub
-                  </a>
-                )}
-                {user.portfolio_url && (
-                  <a
-                    href={user.portfolio_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors p-2 rounded-md hover:bg-secondary/50"
-                  >
-                    <Globe className="h-4 w-4" />
-                    Portfolio
-                  </a>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+            {/* Actions */}
+            <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0 md:mb-4">
+              {isOwnProfile ? (
+                <Button asChild>
+                  <Link href={`/${user.role}/profile/edit`}>Edit Profile</Link>
+                </Button>
+              ) : (
+                <>
+                  {!connectionStatus ? (
+                    <Button className="gap-2" onClick={handleConnect}>
+                      <UserPlus className="h-4 w-4" /> Connect
+                    </Button>
+                  ) : connectionStatus === 'sent' ? (
+                    <Button className="gap-2" disabled variant="secondary">
+                      <Check className="h-4 w-4" /> Pending
+                    </Button>
+                  ) : connectionStatus === 'received' ? (
+                    <Button className="gap-2" disabled variant="secondary">
+                      Request Received
+                    </Button>
+                  ) : (
+                    <Button className="gap-2" disabled variant="outline">
+                      <UserCheck className="h-4 w-4" /> Connected
+                    </Button>
+                  )}
 
-          {/* Right Column - Posts and Activity */}
-          <motion.div
-            className="lg:col-span-2 space-y-6"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <Card className="border-none shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="h-6 w-1 bg-primary rounded-full" />
-                  Posts
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {posts.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-lg font-medium">No posts yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {currentUserId === user.id 
-                        ? "Share your thoughts and experiences with your network!"
-                        : `${user.name} hasn't posted anything yet.`}
-                    </p>
-                  </div>
-                ) : (
-                  posts.map((post) => (
-                    <Card key={post.id} className="border-none shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <CardContent className="p-6 space-y-4">
-                        <div className="flex items-center space-x-4">
-                          <Avatar className="h-12 w-12 ring-2 ring-background">
-                            {post.user.avatar_url ? (
-                              <AvatarImage src={post.user.avatar_url} alt={post.user.name} />
-                            ) : (
-                              <AvatarFallback>{post.user.name?.charAt(0)}</AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{post.user.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-base leading-relaxed whitespace-pre-wrap">{post.content}</p>
-                        {post.image_url && (
-                          <img
-                            src={post.image_url}
-                            alt="Post image"
-                            className="rounded-lg max-h-96 w-full object-cover hover:opacity-95 transition-opacity cursor-pointer"
-                          />
-                        )}
-                        <Separator />
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground pt-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`gap-2 ${post.has_liked ? 'text-red-500 hover:text-red-600' : 'hover:text-primary'}`}
-                            onClick={() => handleLike(post.id, post.has_liked)}
-                          >
-                            <ThumbsUp className={`h-4 w-4 ${post.has_liked ? 'fill-current' : ''}`} />
-                            <span>{post.likes_count}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`gap-2 ${expandedComments.includes(post.id) ? 'text-primary' : ''}`}
-                            onClick={() => toggleComments(post.id)}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                            <span>{post.comments_count}</span>
-                          </Button>
-                        </div>
-                        <Comments
-                          postId={post.id}
-                          isExpanded={expandedComments.includes(post.id)}
-                          onToggle={() => toggleComments(post.id)}
-                          onCommentCountChange={(count) => handleCommentCountChange(post.id, count)}
-                        />
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                  <Button variant="outline" className="gap-2">
+                    <MessageSquare className="h-4 w-4" /> Message
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
+      </div>
+
+      <Tabs defaultValue="profile" className="w-full">
+        {isOwnProfile && (
+          <div className="flex items-center mb-6">
+            <TabsList>
+              <TabsTrigger value="profile">Overview</TabsTrigger>
+              <TabsTrigger value="connections">Connections</TabsTrigger>
+            </TabsList>
+          </div>
+        )}
+
+        <TabsContent value="profile" className="mt-0 focus-visible:outline-none">
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            {/* Left Column (Main Details) */}
+            <div className="md:col-span-2 space-y-6">
+
+
+
+              {/* Education Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Education</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {education.map((edu, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                        <GraduationCap className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">{edu.school}</h3>
+                        <p className="text-sm text-foreground/80">{edu.degree}, {edu.field}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{edu.start} - {edu.end}</p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Experience Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Experience</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {(user.current_company || user.current_position) && (
+                    <div className="flex gap-4">
+                      <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                        <Briefcase className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">{user.current_position || "Position"}</h3>
+                        <p className="text-sm text-foreground/80">{user.current_company || "Company"}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Present</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {user.internships && user.internships.length > 0 ? (
+                    user.internships.map((exp: any, i: number) => (
+                      <div key={i} className="flex gap-4">
+                        <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                          <Briefcase className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">{exp.position}</h3>
+                          <p className="text-sm text-foreground/80">{exp.company}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{exp.duration}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    !user.current_company && !user.current_position && (
+                      <p className="text-muted-foreground text-sm">No experience details listed.</p>
+                    )
+                  )}
+                </CardContent>
+              </Card>
+
+
+
+              {/* Certifications (Mock/Future) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Licenses & Certifications</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {user.certifications && user.certifications.length > 0 ? (
+                    <div className="space-y-4">
+                      {user.certifications.map((cert: any, i: number) => (
+                        <CertificationItem key={i} cert={cert} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No certifications listed.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Activity / Posts */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                    {userPosts.length > 0 ? (
+                      userPosts.map(post => (
+                        <div key={post.id} className="min-w-[320px] max-w-[320px] snap-center">
+                          <PostCard
+                            post={post}
+                            currentUserId={currentUser?.id}
+                            onDelete={(id: string) => setUserPosts(prev => prev.filter(p => p.id !== id))}
+                            disableProfileLink={true}
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-4">No recent activity.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column (Sidebar) */}
+            <div className="space-y-6">
+
+              {/* Contact Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-md">Contact Info</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {user.email && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <a href={`mailto:${user.email}`} className="hover:underline text-foreground">{user.email}</a>
+                    </div>
+                  )}
+                  {user.mobile_number && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span>{user.mobile_number}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-2">
+                    {user.github_url && (
+                      <Button variant="ghost" size="icon" asChild title="GitHub">
+                        <a href={user.github_url} target="_blank" rel="noreferrer"><Github className="h-5 w-5" /></a>
+                      </Button>
+                    )}
+                    {user.linkedin_url && (
+                      <Button variant="ghost" size="icon" asChild title="LinkedIn">
+                        <a href={user.linkedin_url} target="_blank" rel="noreferrer"><Linkedin className="h-5 w-5 text-blue-700" /></a>
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Skills */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-md">Skills</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {skills.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {skills.map((skill: string, i: number) => (
+                        <Badge key={i} variant="secondary" className="px-3 py-1 font-normal text-sm">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No skills added yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Achievements / Coding Stats (Student specific) */}
+              {(user.role === 'student' || user.leetcode_url || user.codechef_url || user.hackerrank_url || user.codeforces_url) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-md">Coding Profiles</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    {[
+                      { key: 'leetcode_url', name: 'LeetCode', icon: 'https://cdn.simpleicons.org/leetcode/FFA116' },
+                      { key: 'codechef_url', name: 'CodeChef', icon: 'https://cdn.simpleicons.org/codechef/5B4638' },
+                      { key: 'hackerrank_url', name: 'HackerRank', icon: 'https://cdn.simpleicons.org/hackerrank/2EC866' },
+                      { key: 'codeforces_url', name: 'Codeforces', icon: 'https://cdn.simpleicons.org/codeforces/1F8ACB' }
+                    ].map((platform) => {
+                      const url = user[platform.key];
+                      if (!url) return null;
+                      return (
+                        <a key={platform.key} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-2.5 hover:bg-muted rounded-md transition-all group border border-transparent hover:border-border">
+                          <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center shrink-0">
+                            <img src={platform.icon} alt={platform.name} className="h-5 w-5" />
+                          </div>
+                          <span className="text-sm font-medium flex-1">{platform.name}</span>
+                          <LinkIcon className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                        </a>
+                      );
+                    })}
+
+                    {!user.leetcode_url && !user.codechef_url && !user.hackerrank_url && !user.codeforces_url && (
+                      <p className="text-sm text-muted-foreground px-2">No profiles linked yet.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+            </div>
+          </div>
+        </TabsContent>
+
+        {isOwnProfile && (
+          <TabsContent value="connections" className="mt-0 focus-visible:outline-none">
+            <div className="max-w-6xl mx-auto">
+              <ConnectionsView currentUserId={currentUser?.id || user.id} currentUserRole={currentUser?.role || user.role || 'student'} />
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
+
+    </div >
+  );
+}
+
+function CertificationItem({ cert }: { cert: any }) {
+  const content = (
+    <div className="flex gap-4 group">
+      <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+        <Award className="h-6 w-6 text-primary" />
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold flex items-center gap-2">
+          {cert.name}
+          {cert.url && <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity" />}
+        </h3>
+        <p className="text-sm text-foreground/80">{cert.issuer}</p>
+        <p className="text-xs text-muted-foreground mt-1">{cert.date}</p>
       </div>
     </div>
   );
-} 
+
+  if (cert.url) {
+    return (
+      <a
+        href={cert.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return <div className="p-2 -mx-2">{content}</div>;
+}

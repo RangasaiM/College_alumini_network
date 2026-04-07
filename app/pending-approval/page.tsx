@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Clock } from "lucide-react";
@@ -38,8 +38,8 @@ export default function PendingApprovalPage() {
 
       if (user.is_approved) {
         // If user is approved, redirect to their dashboard
-        const dashboardPath = user.role === 'admin' 
-          ? '/admin/dashboard' 
+        const dashboardPath = user.role === 'admin'
+          ? '/admin/dashboard'
           : user.role === 'alumni'
             ? '/alumni/dashboard'
             : '/student/dashboard';

@@ -4,11 +4,12 @@ import { UserDirectoryClient } from "./user-directory-client";
 interface User {
   id: string;
   email: string;
-  full_name?: string;
+  name?: string;
   avatar_url?: string;
   role: string;
   is_approved: boolean;
   department?: string;
+  gender?: string;
   graduation_year?: number;
   created_at: string;
 }

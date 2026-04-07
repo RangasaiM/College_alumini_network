@@ -29,6 +29,7 @@ export interface Database {
           graduation_year: number | null;
           is_mentorship_available: boolean | null;
           bio: string | null;
+          mobile_number: string | null;
           created_at: string;
         };
         Insert: {
@@ -50,6 +51,7 @@ export interface Database {
           graduation_year?: number | null;
           is_mentorship_available?: boolean | null;
           bio?: string | null;
+          mobile_number?: string | null;
           created_at?: string;
         };
         Update: {
@@ -71,35 +73,45 @@ export interface Database {
           graduation_year?: number | null;
           is_mentorship_available?: boolean | null;
           bio?: string | null;
+          mobile_number?: string | null;
           created_at?: string;
         };
       };
       announcements: {
         Row: {
-          id: number;
-          title: string | null;
-          content: string | null;
+          id: string;
+          title: string;
+          content: string;
+          target_role: string;
+          images: string[] | null;
+          user_id: string;
           created_at: string;
-          admin_id: string | null;
+          updated_at: string;
         };
         Insert: {
-          id?: number;
-          title?: string | null;
-          content?: string | null;
+          id?: string;
+          title: string;
+          content: string;
+          target_role?: string;
+          images?: string[] | null;
+          user_id: string;
           created_at?: string;
-          admin_id?: string | null;
+          updated_at?: string;
         };
         Update: {
-          id?: number;
-          title?: string | null;
-          content?: string | null;
+          id?: string;
+          title?: string;
+          content?: string;
+          target_role?: string;
+          images?: string[] | null;
+          user_id?: string;
           created_at?: string;
-          admin_id?: string | null;
+          updated_at?: string;
         };
       };
       messages: {
         Row: {
-          id: number;
+          id: string;
           sender_id: string;
           receiver_id: string;
           content: string;
@@ -107,7 +119,7 @@ export interface Database {
           is_read: boolean;
         };
         Insert: {
-          id?: number;
+          id?: string;
           sender_id: string;
           receiver_id: string;
           content: string;
@@ -115,7 +127,7 @@ export interface Database {
           is_read?: boolean;
         };
         Update: {
-          id?: number;
+          id?: string;
           sender_id?: string;
           receiver_id?: string;
           content?: string;
@@ -129,7 +141,6 @@ export interface Database {
           requester_id: string;
           receiver_id: string;
           status: "pending" | "accepted" | "rejected";
-          message: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -137,8 +148,7 @@ export interface Database {
           id?: string;
           requester_id: string;
           receiver_id: string;
-          status?: "pending" | "accepted" | "rejected";
-          message?: string | null;
+          status: "pending" | "accepted" | "rejected";
           created_at?: string;
           updated_at?: string;
         };
@@ -147,7 +157,6 @@ export interface Database {
           requester_id?: string;
           receiver_id?: string;
           status?: "pending" | "accepted" | "rejected";
-          message?: string | null;
           created_at?: string;
           updated_at?: string;
         };

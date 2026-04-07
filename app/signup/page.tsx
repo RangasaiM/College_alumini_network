@@ -51,12 +51,23 @@ const DEPARTMENT_OPTIONS = [
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  confirmPassword: z.string().min(6, { message: "Confirm password is required" }),
   name: z.string().min(1, { message: "Name is required" }),
+  rollNumber: z.string().min(1, { message: "Roll number is required" }),
   role: z.enum(["student", "alumni"]),
   department: z.string().min(1, { message: "Department is required" }),
   year: z.string().refine((val) => !isNaN(parseInt(val)), {
     message: "Please enter a valid year",
   }),
+  gender: z.enum(["Male", "Female", "Other"], {
+    required_error: "Please select a gender",
+  }),
+  dob: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Please enter a valid date of birth",
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -72,10 +83,14 @@ export default function SignUpPage() {
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: "",
       name: "",
+      rollNumber: "",
       role: "student",
       department: "CSE",
       year: new Date().getFullYear().toString(),
+      gender: "Male",
+      dob: "",
     },
   });
 
@@ -83,70 +98,36 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-      // First, check if user exists in auth by trying to sign in
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      // First, try to sign up the user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
+        options: {
+          data: {
+            name: data.name,
+            roll_number: data.rollNumber,
+            role: data.role,
+            department: data.department,
+            year: parseInt(data.year),
+            gender: data.gender,
+            dob: data.dob,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
-      let userId;
-
-      if (signInData?.user) {
-        // User exists in auth, use their ID
-        userId = signInData.user.id;
-      } else if (!signInError || signInError.message.includes("Invalid login credentials")) {
-        // User doesn't exist, create them
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: {
-              name: data.name,
-              role: data.role,
-              department: data.department,
-              year: parseInt(data.year),
-            },
-          },
-        });
-
-        if (signUpError) {
-          if (signUpError.message.includes("already registered")) {
-            // If user is already registered but we couldn't sign in,
-            // there might be a password mismatch
-            toast({
-              title: "Account already exists",
-              description: "Please sign in with your existing password or reset it if forgotten.",
-              variant: "destructive",
-            });
-            router.push('/auth/signin');
-            return;
-          }
-          throw signUpError;
-        }
-
-        if (!signUpData.user) {
-          throw new Error("Failed to create auth user");
-        }
-
-        userId = signUpData.user.id;
+      if (signUpError) {
+        console.error('Signup error:', signUpError);
+        throw signUpError;
       }
 
-      if (!userId) {
-        throw new Error("Failed to get user ID");
+      if (!signUpData.user) {
+        throw new Error("Failed to create auth user");
       }
 
-      // Check if user profile already exists
-      const { data: existingProfile, error: profileCheckError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', userId)
-        .single();
-
-      if (profileCheckError) {
-        console.error('Error checking existing profile:', profileCheckError);
-      }
-
-      if (existingProfile) {
+      // If user signed up but hasn't confirmed email, redirect to success page
+      if (!signUpData.user.identities || signUpData.user.identities.length === 0) {
+        // This means the user already exists
         toast({
           title: "Account already exists",
           description: "Please sign in with your existing account.",
@@ -156,20 +137,26 @@ export default function SignUpPage() {
         return;
       }
 
-      // Create user profile
+      // Now create the user profile immediately (since RLS is disabled)
+      const userId = signUpData.user.id;
+
+      // Create user profile in the users table
       const userData = {
         id: userId,
         email: data.email,
         name: data.name,
+        roll_number: data.rollNumber,
         role: data.role,
         department: data.department,
         is_approved: false,
-        ...(data.role === 'alumni' ? { 
+        gender: data.gender,
+        date_of_birth: data.dob,
+        ...(data.role === 'alumni' ? {
           graduation_year: parseInt(data.year),
           current_company: null,
           current_position: null,
         } : {
-          batch_year: parseInt(data.year)
+          graduation_year: parseInt(data.year),
         })
       };
 
@@ -183,7 +170,7 @@ export default function SignUpPage() {
         console.error('Profile creation error:', profileError);
         // Log the actual data being inserted for debugging
         console.log('Attempted to insert:', userData);
-        
+
         if (profileError.code === '23505') {
           toast({
             title: "Account already exists",
@@ -193,7 +180,7 @@ export default function SignUpPage() {
           router.push('/auth/signin');
           return;
         }
-        
+
         throw new Error(`Failed to create user profile: ${profileError.message}`);
       }
 
@@ -202,10 +189,10 @@ export default function SignUpPage() {
       toast({
         title: "Account created",
         description:
-          "Your account has been created and is pending approval. You'll be notified via email once approved.",
+          "Your account has been created successfully! You can now sign in.",
       });
 
-      router.push(`/signup-success?email=${encodeURIComponent(data.email)}`);
+      router.push('/auth/signin');
     } catch (error: any) {
       console.error("Error during signup:", error);
       toast({
@@ -250,6 +237,20 @@ export default function SignUpPage() {
 
               <FormField
                 control={form.control}
+                name="rollNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Roll Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your roll number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
@@ -275,6 +276,62 @@ export default function SignUpPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input placeholder="••••••••" type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gender</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dob"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Birth</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}
@@ -336,7 +393,7 @@ export default function SignUpPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        {form.watch("role") === "student" ? "Batch Year" : "Graduation Year"}
+                        Graduation Year
                       </FormLabel>
                       <FormControl>
                         <Input placeholder="2020" {...field} />

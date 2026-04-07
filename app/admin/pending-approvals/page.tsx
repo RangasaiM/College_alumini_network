@@ -10,13 +10,13 @@ import { ApprovalActions } from "./approval-actions";
 
 export default async function PendingApprovalsPage() {
   const session = await getSession();
-  
+
   if (!session) {
     redirect("/signin");
   }
-  
+
   const userDetails = await getUserDetails();
-  
+
   if (!userDetails || userDetails.role !== "admin") {
     redirect("/");
   }
@@ -71,7 +71,7 @@ function PendingUsersLoadingSkeleton() {
 
 async function PendingUsersList() {
   const pendingUsers = await getPendingUsers();
-  
+
   if (!pendingUsers || pendingUsers.length === 0) {
     return (
       <div className="text-center py-12">
@@ -99,7 +99,7 @@ async function PendingUsersList() {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-8">
       {pendingUsers.map((user) => (
@@ -128,34 +128,37 @@ async function PendingUsersList() {
                 </p>
               </div>
             </div>
-            
+
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm pl-16">
+              <div>
+                <span className="text-muted-foreground">Roll No:</span>{" "}
+                <span className="font-mono">{user.roll_number || 'N/A'}</span>
+              </div>
               <div>
                 <span className="text-muted-foreground">Role:</span>{" "}
                 <span className="capitalize">{user.role}</span>
               </div>
-              {user.role === "student" ? (
-                <>
-                  <div>
-                    <span className="text-muted-foreground">Batch:</span>{" "}
-                    <span>{user.batch_year}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Department:</span>{" "}
-                    <span>{user.department}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <span className="text-muted-foreground">Graduation:</span>{" "}
-                    <span>{user.graduation_year}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Current Job:</span>{" "}
-                    <span>{user.current_job}</span>
-                  </div>
-                </>
+              <div>
+                <span className="text-muted-foreground">Department:</span>{" "}
+                <span>{user.department}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Gender:</span>{" "}
+                <span>{user.gender || '-'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">DOB:</span>{" "}
+                <span>{user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString() : '-'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Graduation Year:</span>{" "}
+                <span>{user.graduation_year}</span>
+              </div>
+              {user.role === "alumni" && (
+                <div>
+                  <span className="text-muted-foreground">Current Job:</span>{" "}
+                  <span>{user.current_position || '-'}</span>
+                </div>
               )}
               <div className="col-span-2">
                 <span className="text-muted-foreground">Registered:</span>{" "}
@@ -163,7 +166,7 @@ async function PendingUsersList() {
               </div>
             </div>
           </div>
-          
+
           <ApprovalActions userId={user.id} />
         </div>
       ))}

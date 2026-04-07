@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UserCard } from '@/shared/users/user-card';
+import { UserCard } from '@/app/shared/users/user-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -110,14 +110,14 @@ export function DiscoverContent() {
           placeholder="Search by name, company, or position..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1"
+          className="flex-1 input shadow-sm bg-white text-foreground"
         />
-        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-          <SelectTrigger className="w-[180px]">
+        <Select value={departmentFilter || 'all'} onValueChange={(val) => setDepartmentFilter(val === 'all' ? '' : val)}>
+          <SelectTrigger className="w-[180px] btn btn-secondary shadow-sm bg-white text-foreground">
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Departments</SelectItem>
+            <SelectItem value="all">All Departments</SelectItem>
             {departments.map((dept) => (
               <SelectItem key={dept} value={dept}>
                 {dept}
@@ -125,12 +125,12 @@ export function DiscoverContent() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={companyFilter} onValueChange={setCompanyFilter}>
-          <SelectTrigger className="w-[180px]">
+        <Select value={companyFilter || 'all'} onValueChange={(val) => setCompanyFilter(val === 'all' ? '' : val)}>
+          <SelectTrigger className="w-[180px] btn btn-secondary shadow-sm bg-white text-foreground">
             <SelectValue placeholder="Company" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Companies</SelectItem>
+            <SelectItem value="all">All Companies</SelectItem>
             {companies.map((company) => (
               <SelectItem key={company} value={company}>
                 {company}
@@ -148,7 +148,11 @@ export function DiscoverContent() {
             actions={
               <Button
                 variant="outline"
-                onClick={() => handleConnect(user.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleConnect(user.id);
+                }}
               >
                 Connect
               </Button>

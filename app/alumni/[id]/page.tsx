@@ -40,10 +40,12 @@ export default function AlumniProfilePage({ params }: { params: { id: string } }
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [isCurrentUser, setIsCurrentUser] = useState(false);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchProfile();
+    checkIfCurrentUser();
   }, [params.id]);
 
   const fetchProfile = async () => {
@@ -77,6 +79,16 @@ export default function AlumniProfilePage({ params }: { params: { id: string } }
       toast.error('Failed to load profile');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const checkIfCurrentUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsCurrentUser(session?.user?.id === params.id);
+    } catch (error) {
+      console.error('Error checking current user:', error);
+      setIsCurrentUser(false);
     }
   };
 
@@ -381,7 +393,7 @@ export default function AlumniProfilePage({ params }: { params: { id: string } }
                       </a>
                     </div>
                   )}
-                  {params.id === (await supabase.auth.getSession()).data.session?.user.id && (
+                  {isCurrentUser && (
                     <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
                   )}
                 </div>

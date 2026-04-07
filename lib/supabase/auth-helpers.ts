@@ -10,7 +10,6 @@ interface UserProfile {
   name: string;
   role: string;
   department: string | null;
-  batch_year: number | null;
   graduation_year: number | null;
   current_company: string | null;
   current_position: string | null;
@@ -24,6 +23,21 @@ interface UserProfile {
   is_approved: boolean;
   created_at: string;
   updated_at: string;
+  mobile_number?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  roll_number?: string | null;
+  skills?: string[] | null;
+  internships?: any[] | null;
+  projects?: any[] | null;
+  certifications?: any[] | null;
+  academic_achievements?: string[] | null;
+  areas_of_interest?: string[] | null;
+  career_goals?: string | null;
+  leetcode_url?: string | null;
+  codechef_url?: string | null;
+  hackerrank_url?: string | null;
+  codeforces_url?: string | null;
 }
 
 // Server-side functions
@@ -54,9 +68,9 @@ export const getSession = cache(async () => {
   try {
     console.log('Auth Helper: Getting server session');
     const {
-      data: { session },
+      data: { user },
       error
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser(); // Changed from getSession to getUser for security
 
     if (error) {
       console.error('Auth Helper: Session error:', error);
@@ -64,11 +78,12 @@ export const getSession = cache(async () => {
     }
 
     console.log('Auth Helper: Session status:', {
-      exists: !!session,
-      userId: session?.user?.id
+      exists: !!user,
+      userId: user?.id
     });
 
-    return session;
+    // Return a session-like object for compatibility
+    return { user };
   } catch (error) {
     console.error('Auth Helper: Unexpected error:', error);
     return null;
@@ -107,27 +122,7 @@ export const getServerUserDetails = cache(async () => {
     try {
       const { data: fullUserData, error: fullError } = await supabase
         .from('users')
-        .select(`
-          id,
-          email,
-          name,
-          role,
-          department,
-          batch_year,
-          graduation_year,
-          current_company,
-          current_position,
-          location,
-          bio,
-          linkedin_url,
-          github_url,
-          twitter_url,
-          website_url,
-          avatar_url,
-          is_approved,
-          created_at,
-          updated_at
-        `)
+        .select('*')
         .eq('id', session.user.id)
         .single();
 
@@ -165,27 +160,7 @@ export const getClientUserDetails = async () => {
 
   const { data: userDetails } = await supabase
     .from('users')
-    .select(`
-      id,
-      email,
-      name,
-      role,
-      department,
-      batch_year,
-      graduation_year,
-      current_company,
-      current_position,
-      location,
-      bio,
-      linkedin_url,
-      github_url,
-      twitter_url,
-      website_url,
-      avatar_url,
-      is_approved,
-      created_at,
-      updated_at
-    `)
+    .select('*')
     .eq('id', session.user.id)
     .single();
 
@@ -203,27 +178,7 @@ export async function getUserDetails(): Promise<UserProfile | null> {
 
   const { data, error } = await supabase
     .from('users')
-    .select(`
-      id,
-      email,
-      name,
-      role,
-      department,
-      batch_year,
-      graduation_year,
-      current_company,
-      current_position,
-      location,
-      bio,
-      linkedin_url,
-      github_url,
-      twitter_url,
-      website_url,
-      avatar_url,
-      is_approved,
-      created_at,
-      updated_at
-    `)
+    .select('*')
     .eq('id', session.user.id)
     .single();
 
@@ -264,7 +219,6 @@ export async function getPendingUsers(): Promise<UserProfile[]> {
       name,
       role,
       department,
-      batch_year,
       graduation_year,
       current_company,
       current_position,
@@ -275,7 +229,10 @@ export async function getPendingUsers(): Promise<UserProfile[]> {
       twitter_url,
       website_url,
       avatar_url,
+      roll_number,
       is_approved,
+      gender,
+      date_of_birth,
       created_at,
       updated_at
     `)
@@ -295,9 +252,9 @@ export const getServerSession = cache(async () => {
   const supabase = getServerSupabase();
   try {
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    return session;
+      data: { user },
+    } = await supabase.auth.getUser(); // Changed from getSession to getUser for security
+    return { user };
   } catch (error) {
     console.error('Error:', error);
     return null;

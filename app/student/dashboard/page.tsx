@@ -3,6 +3,7 @@ import { getServerSession, getServerUserDetails } from "@/lib/supabase/auth-help
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, Users, MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { AnnouncementsList } from "@/components/announcements/announcements-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NetworkSection } from "@/app/shared/network/network-section";
@@ -24,19 +25,19 @@ export default async function StudentDashboardPage() {
         </p>
       </div>
 
-      <NetworkSection userRole="student" />
+      {/* Announcements Hero Section */}
+      <section className="w-full">
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h2 className="text-lg font-semibold text-muted-foreground">Latest Announcements</h2>
+        </div>
+        <Suspense fallback={<Skeleton className="h-[300px] w-full rounded-xl" />}>
+          <AnnouncementsList limit={5} />
+        </Suspense>
+      </section>
 
-      <div className="grid gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Announcements</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<Skeleton className="h-[200px]" />}>
-              <AnnouncementsList limit={3} />
-            </Suspense>
-          </CardContent>
-        </Card>
+      {/* Network & Connections Section */}
+      <div className="grid gap-8">
+        <NetworkSection userRole="student" />
       </div>
     </div>
   );

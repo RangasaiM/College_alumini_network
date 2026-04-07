@@ -66,6 +66,33 @@ export const searchSchema = z.object({
   limit: z.number().min(1).max(50).optional(),
 });
 
+// Job Board Schemas
+export const jobPostSchema = z.object({
+  title: z.string().min(3, 'Job title must be at least 3 characters').max(100, 'Job title must be less than 100 characters'),
+  company_name: z.string().min(2, 'Company name must be at least 2 characters').max(100, 'Company name must be less than 100 characters'),
+  job_type: z.enum(['internship', 'full-time', 'part-time', 'contract']),
+  location: z.enum(['remote', 'onsite', 'hybrid']),
+  required_skills: z.array(z.string()).min(1, 'At least one skill is required'),
+  description: z.string().min(20, 'Description must be at least 20 characters').max(5000, 'Description must be less than 5000 characters'),
+  eligibility: z.enum(['student', 'alumni', 'both']),
+  application_deadline: z.union([z.string(), z.date()]).optional(),
+});
+
+export const jobApplicationSchema = z.object({
+  job_post_id: z.string().uuid(),
+  resume_url: z.string().url('Invalid resume URL'),
+  cover_message: z.string().max(1000, 'Cover message must be less than 1000 characters').optional(),
+});
+
+export const jobFilterSchema = z.object({
+  job_type: z.enum(['internship', 'full-time', 'part-time', 'contract']).optional(),
+  location: z.enum(['remote', 'onsite', 'hybrid']).optional(),
+  skills: z.array(z.string()).optional(),
+  eligibility: z.enum(['student', 'alumni', 'both']).optional(),
+  search: z.string().optional(),
+  posted_by: z.enum(['admin', 'alumni']).optional(),
+});
+
 // API Response Types
 export type ProfileResponse = z.infer<typeof profileSchema>;
 export type StudentProfileResponse = z.infer<typeof studentProfileSchema>;
@@ -73,4 +100,7 @@ export type AlumniProfileResponse = z.infer<typeof alumniProfileSchema>;
 export type ConnectionResponse = z.infer<typeof connectionSchema>;
 export type MessageResponse = z.infer<typeof messageSchema>;
 export type AnnouncementResponse = z.infer<typeof announcementSchema>;
-export type SearchResponse = z.infer<typeof searchSchema>; 
+export type SearchResponse = z.infer<typeof searchSchema>;
+export type JobPostResponse = z.infer<typeof jobPostSchema>;
+export type JobApplicationResponse = z.infer<typeof jobApplicationSchema>;
+export type JobFilterResponse = z.infer<typeof jobFilterSchema>; 

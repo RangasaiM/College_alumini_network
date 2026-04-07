@@ -21,6 +21,7 @@ interface Announcement {
     name: string;
     avatar_url: string;
   };
+  images?: string[] | null;
 }
 
 export default function AnnouncementsPage() {
@@ -109,7 +110,7 @@ export default function AnnouncementsPage() {
             <AnnouncementForm onAnnouncementCreated={handleAnnouncementCreated} />
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Recent Announcements</CardTitle>
@@ -121,7 +122,7 @@ export default function AnnouncementsPage() {
             {isLoading ? (
               <AnnouncementsLoadingSkeleton />
             ) : (
-              <AdminAnnouncementsList 
+              <AdminAnnouncementsList
                 initialAnnouncements={announcements}
                 onAnnouncementDeleted={handleAnnouncementDeleted}
               />

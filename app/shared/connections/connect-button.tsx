@@ -65,7 +65,11 @@ export function ConnectButton({ receiverId, receiverName, onSuccess }: ConnectBu
 
   return (
     <>
-      <Button onClick={() => setIsOpen(true)}>
+      <Button onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsOpen(true);
+      }}>
         Connect
       </Button>
 

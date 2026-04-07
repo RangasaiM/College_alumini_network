@@ -16,6 +16,7 @@ import { Sidebar } from "./sidebar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { Input } from "@/components/ui/input";
 
 interface UserData {
   id: string;
@@ -43,10 +44,8 @@ interface DashboardLayoutProps {
 }
 
 const getRequiredFields = (role: string): string[] => {
-  if (role === 'student') {
-    return ['github_url', 'linkedin_url', 'leetcode_url', 'codechef_url', 'codeforces_url', 'skills', 'bio'];
-  }
-  return ['current_company', 'current_role', 'experience_years', 'linkedin_url', 'github_url', 'portfolio_url', 'skills', 'bio'];
+  // Disabling strict requirements to prevent persistent popup
+  return [];
 };
 
 export default function DashboardLayout({
@@ -60,6 +59,7 @@ export default function DashboardLayout({
   const [showPendingDialog, setShowPendingDialog] = useState(false);
   const [notifications, setNotifications] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  /* SEARCH REMOVED */
 
   useEffect(() => {
     let mounted = true;
@@ -98,9 +98,9 @@ export default function DashboardLayout({
 
         // Set user data and handle profile completion
         const typedData = data as UserData;
-        
+
         if (!mounted) return;
-        
+
         setUserData(typedData);
 
         // Check profile completion
@@ -109,13 +109,16 @@ export default function DashboardLayout({
           if (field === 'skills') {
             return Array.isArray(typedData[field]) && typedData[field].length > 0;
           }
-          return !!typedData[field];
+          const val = typedData[field];
+          // Allow 0 as valid for numbers (e.g. 0 years experience)
+          if (typeof val === 'number') return true;
+          return !!val;
         }).length;
 
         const completionPercentage = (completedFields / requiredFields.length) * 100;
-        
+
         // Show reminder if profile is not 100% complete
-        if (completionPercentage < 100) {
+        if (completedFields < requiredFields.length) {
           setShowReminder(true);
         }
 
@@ -143,6 +146,18 @@ export default function DashboardLayout({
           setShowPendingDialog(true);
         }
 
+        // Fetch notifications (pending connection requests)
+        // We use !inner to ensure we only count requests from users that still exist
+        const { count, error: countError } = await supabase
+          .from('connections')
+          .select('id, requester:users!requester_id!inner(id)', { count: 'exact', head: true })
+          .eq('receiver_id', session.user.id)
+          .eq('status', 'pending');
+
+        if (!countError) {
+          setNotifications(count || 0);
+        }
+
         setIsLoading(false);
       } catch (error: any) {
         console.error('Error checking profile status:', error);
@@ -155,8 +170,27 @@ export default function DashboardLayout({
 
     checkProfileStatus();
 
+    // Subscribe to realtime changes for notifications
+    const channel = supabase
+      .channel('notifications-counter')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'connections',
+          filter: `receiver_id=eq.${session?.user?.id}`,
+        },
+        () => {
+          // Re-fetch count on any change
+          checkProfileStatus();
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
+      supabase.removeChannel(channel);
     };
   }, [session?.user?.id, role, supabase, router, isSessionLoading]);
 
@@ -166,7 +200,9 @@ export default function DashboardLayout({
   };
 
   const handleNotificationsClick = () => {
-    router.push(`/${role}/notifications`);
+    // Navigate to connections page since that's where requests are shown
+    // In the future, we can create a dedicated notifications dropdown/page
+    router.push(`/${role}/connections?tab=pending`);
   };
 
   if (isSessionLoading || isLoading) {
@@ -182,7 +218,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="fixed inset-0 flex overflow-hidden">
       <Sidebar role={role} />
       <div className="flex-1 flex flex-col">
         <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
@@ -191,6 +227,9 @@ export default function DashboardLayout({
               {role.charAt(0).toUpperCase() + role.slice(1)} Dashboard
             </h1>
           </div>
+
+
+
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -219,8 +258,8 @@ export default function DashboardLayout({
         onOpenChange={setShowReminder}
       />
       {!isLoading && userData && !userData.is_approved && role !== 'admin' && (
-        <Dialog 
-          open={showPendingDialog} 
+        <Dialog
+          open={showPendingDialog}
           onOpenChange={setShowPendingDialog}
         >
           <DialogContent className="sm:max-w-[425px]">
@@ -230,7 +269,7 @@ export default function DashboardLayout({
                 Profile Pending Approval
               </DialogTitle>
               <DialogDescription>
-                Your profile is currently pending approval from an administrator. 
+                Your profile is currently pending approval from an administrator.
                 While you wait, you can complete your profile to speed up the approval process.
               </DialogDescription>
             </DialogHeader>

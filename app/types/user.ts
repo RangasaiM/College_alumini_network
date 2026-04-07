@@ -6,11 +6,12 @@ interface BaseUser {
   department: string;
   bio?: string;
   is_approved: boolean;
+  mobile_number?: string;
 }
 
 interface StudentUser extends BaseUser {
   role: 'student';
-  batch_year: number;
+  graduation_year: number;
   github_url?: string;
   leetcode_url?: string;
   codechef_url?: string;
@@ -34,7 +35,7 @@ interface AlumniUser extends BaseUser {
 
 interface AdminUser extends BaseUser {
   role: 'admin';
-  position: string;
+  linkedin_url?: string;
 }
 
 type User = StudentUser | AlumniUser | AdminUser;

@@ -2,20 +2,31 @@
 
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from "date-fns";
-import { ThumbsUp, MessageSquare, Image as ImageIcon, Send, Search, Users2, Trash2 } from "lucide-react";
+import { Image as ImageIcon, Send, Search, Users2 } from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from "sonner";
-import { Comments } from "@/app/shared/posts/comments";
+import { PostCard } from "@/app/shared/posts/post-card";
+import { UserListItem } from "@/components/shared/user-list-item";
+
+
+interface User {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  role: string;
+  current_position?: string;
+  current_company?: string;
+  department?: string;
+  bio?: string;
+}
 
 interface Post {
   id: string;
@@ -35,24 +46,16 @@ interface Post {
   has_liked: boolean;
 }
 
-interface User {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-  role: string;
-  current_position?: string;
-  current_company?: string;
-  department?: string;
-}
+
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [expandedComments, setExpandedComments] = useState<string[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -62,6 +65,31 @@ export default function PostsPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const router = useRouter();
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      searchUsers();
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  }, [searchQuery]);
+
+  const searchUsers = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, avatar_url, role, current_position, current_company, department, bio')
+      .or(`name.ilike.%${searchQuery}%, department.ilike.%${searchQuery}%, current_company.ilike.%${searchQuery}%`)
+      .limit(5);
+
+    if (error) {
+      console.error('Error searching users:', error);
+      return;
+    }
+
+    setSearchResults(data || []);
+    setShowSearchResults(true);
+  };
 
   useEffect(() => {
     const checkSession = async () => {
@@ -77,16 +105,20 @@ export default function PostsPage() {
 
   useEffect(() => {
     fetchPosts();
+
+    const channel = supabase
+      .channel('realtime posts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        fetchPosts();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      searchUsers();
-    } else {
-      setSearchResults([]);
-      setShowSearchResults(false);
-    }
-  }, [searchQuery]);
+
 
   const fetchPosts = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -99,29 +131,53 @@ export default function PostsPage() {
       .from('posts')
       .select(`
         *,
-        user:users(id, name, avatar_url, role, current_position, current_company)
+        user:users!posts_user_id_fkey(id, name, avatar_url, role, current_position, current_company)
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) {
       console.error('Error fetching posts:', error);
       return;
     }
 
-    const { data: likesData } = await supabase
-      .from('likes')
-      .select('post_id, user_id');
+    // console.log('Raw postsData:', postsData);
 
-    const { data: commentsData } = await supabase
-      .from('comments')
-      .select('post_id');
+    const postIds = postsData?.map(p => p.id) || [];
+    let likesData: any[] = [];
+    let commentsData: any[] = [];
 
-    const processedPosts = postsData.map(post => {
+    if (postIds.length > 0) {
+      const { data: likes } = await supabase
+        .from('likes')
+        .select('post_id, user_id')
+        .in('post_id', postIds);
+
+      const { data: comments } = await supabase
+        .from('comments')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      if (likes) likesData = likes;
+      if (comments) commentsData = comments;
+    }
+
+    const processedPosts = (postsData || []).map(post => {
       const postLikes = likesData?.filter(like => like.post_id === post.id) || [];
       const postComments = commentsData?.filter(comment => comment.post_id === post.id) || [];
-      
+
+      const postUser = post.user || {
+        id: post.user_id || 'unknown',
+        name: 'Unknown User',
+        avatar_url: null,
+        role: 'member',
+        current_position: '',
+        current_company: ''
+      };
+
       return {
         ...post,
+        user: postUser,
         likes_count: postLikes.length,
         comments_count: postComments.length,
         has_liked: postLikes.some(like => like.user_id === session.user.id)
@@ -132,21 +188,7 @@ export default function PostsPage() {
     setIsLoading(false);
   };
 
-  const searchUsers = async () => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, name, avatar_url, role, current_position, current_company, department')
-      .or(`name.ilike.%${searchQuery}%, department.ilike.%${searchQuery}%, current_company.ilike.%${searchQuery}%`)
-      .limit(5);
 
-    if (error) {
-      console.error('Error searching users:', error);
-      return;
-    }
-
-    setSearchResults(data);
-    setShowSearchResults(true);
-  };
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -171,8 +213,7 @@ export default function PostsPage() {
 
     try {
       setIsUploading(true);
-      
-      // Use 'post_images' as the bucket name to match Supabase storage
+
       const { error: uploadError } = await supabase.storage
         .from('post_images')
         .upload(filePath, file);
@@ -210,7 +251,7 @@ export default function PostsPage() {
     let imageUrl = null;
     if (selectedImage) {
       imageUrl = await uploadImage(selectedImage);
-      if (!imageUrl && !newPost.trim()) return; // Don't create post if image upload failed and no text
+      if (!imageUrl && !newPost.trim()) return;
     }
 
     const { error } = await supabase
@@ -234,78 +275,9 @@ export default function PostsPage() {
     fetchPosts();
   };
 
-  const handleLike = async (postId: string, hasLiked: boolean) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    if (hasLiked) {
-      await supabase
-        .from('likes')
-        .delete()
-        .match({ post_id: postId, user_id: session.user.id });
-    } else {
-      await supabase
-        .from('likes')
-        .insert([{ post_id: postId, user_id: session.user.id }]);
-    }
-
-    fetchPosts();
-  };
-
-  const toggleComments = (postId: string) => {
-    setExpandedComments(prev => 
-      prev.includes(postId) 
-        ? prev.filter(id => id !== postId)
-        : [...prev, postId]
-    );
-  };
-
-  const handleCommentCountChange = (postId: string, count: number) => {
-    setPosts(prevPosts => prevPosts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          comments_count: count
-        };
-      }
-      return post;
-    }));
-  };
-
-  const handleDeletePost = async (postId: string, userId: string) => {
-    if (currentUserId !== userId) {
-      toast.error("You can only delete your own posts");
-      return;
-    }
-
-    try {
-      // First, delete all likes for this post
-      await supabase
-        .from('likes')
-        .delete()
-        .match({ post_id: postId });
-
-      // Delete all comments for this post
-      await supabase
-        .from('comments')
-        .delete()
-        .match({ post_id: postId });
-
-      // Delete the post itself
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .match({ id: postId });
-
-      if (error) throw error;
-
-      // Remove the post from local state
-      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
-      toast.success("Post deleted successfully");
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      toast.error("Failed to delete post");
-    }
+  // If a post is deleted by PostCard, we remove it from the list
+  const handlePostDeleted = (postId: string) => {
+    setPosts(prev => prev.filter(p => p.id !== postId));
   };
 
   return (
@@ -327,34 +299,18 @@ export default function PostsPage() {
             <Card className="absolute w-full mt-2 z-50 shadow-lg">
               <CardContent className="p-2">
                 {searchResults.map((user) => (
-                  <Link 
-                    key={user.id} 
-                    href={`/profile/${user.id}`}
-                    className="flex items-center gap-3 p-3 hover:bg-secondary/50 rounded-lg transition-colors"
+                  <UserListItem
+                    key={user.id}
+                    user={user}
                     onClick={() => setShowSearchResults(false)}
-                  >
-                    <Avatar className="h-10 w-10">
-                      {user.avatar_url ? (
-                        <AvatarImage src={user.avatar_url} alt={user.name} />
-                      ) : (
-                        <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{user.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {user.role === 'student' ? user.department : `${user.current_position} at ${user.current_company}`}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {user.role}
-                    </Badge>
-                  </Link>
+                    hideRole={true}
+                  />
                 ))}
               </CardContent>
             </Card>
           )}
         </div>
+
 
         {/* Create Post */}
         <Card className="border-none shadow-md">
@@ -430,98 +386,11 @@ export default function PostsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <Card>
-                <CardHeader className="pb-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-start gap-3">
-                      <Link href={`/alumni/profile/${post.user.id}`}>
-                        <Avatar className="h-10 w-10 cursor-pointer">
-                          <AvatarImage src={post.user.avatar_url || undefined} />
-                          <AvatarFallback>{post.user.name[0]}</AvatarFallback>
-                        </Avatar>
-                      </Link>
-                      <div>
-                        <Link href={`/alumni/profile/${post.user.id}`}>
-                          <h4 className="font-semibold hover:underline cursor-pointer">
-                            {post.user.name}
-                          </h4>
-                        </Link>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>{post.user.role}</span>
-                          {post.user.current_position && (
-                            <>
-                              <span>•</span>
-                              <span>{post.user.current_position}</span>
-                            </>
-                          )}
-                          {post.user.current_company && (
-                            <>
-                              <span>•</span>
-                              <span>{post.user.current_company}</span>
-                            </>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                        </p>
-                      </div>
-                    </div>
-                    {/* Only show delete button for current user's posts */}
-                    {currentUserId === post.user.id && (
-                      <div className="flex items-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeletePost(post.id, post.user.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="pb-3">
-                  <p className="whitespace-pre-wrap mb-4">{post.content}</p>
-                  {post.image_url && (
-                    <div className="relative w-full mb-4">
-                      <img
-                        src={post.image_url}
-                        alt="Post image"
-                        className="w-full rounded-lg object-cover max-h-[500px]"
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-center gap-4 text-muted-foreground">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`gap-2 ${post.has_liked ? 'text-red-500 hover:text-red-600' : ''}`}
-                      onClick={() => handleLike(post.id, post.has_liked)}
-                    >
-                      <ThumbsUp className={`h-4 w-4 ${post.has_liked ? 'fill-current' : ''}`} />
-                      {post.likes_count > 0 && post.likes_count}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => toggleComments(post.id)}
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      {post.comments_count > 0 && post.comments_count}
-                    </Button>
-                  </div>
-                </CardContent>
-                {expandedComments.includes(post.id) && (
-                  <Comments
-                    postId={post.id}
-                    isExpanded={true}
-                    onToggle={() => toggleComments(post.id)}
-                    onCommentCountChange={(count) => handleCommentCountChange(post.id, count)}
-                  />
-                )}
-              </Card>
+              <PostCard
+                post={post}
+                currentUserId={currentUserId}
+                onDelete={handlePostDeleted}
+              />
             </motion.div>
           ))}
           {!isLoading && posts.length === 0 && (
@@ -537,4 +406,4 @@ export default function PostsPage() {
       </div>
     </div>
   );
-} 
+}

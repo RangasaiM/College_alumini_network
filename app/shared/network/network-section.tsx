@@ -95,7 +95,7 @@ export function NetworkSection({ userRole }: NetworkSectionProps) {
     if (!currentUserId) return null;
 
     const connection = connections.find(
-      conn => 
+      conn =>
         (conn.requester_id === currentUserId && conn.receiver_id === userId) ||
         (conn.requester_id === userId && conn.receiver_id === currentUserId)
     );
@@ -106,53 +106,93 @@ export function NetworkSection({ userRole }: NetworkSectionProps) {
     if (connection.requester_id === currentUserId) {
       return connection.status === 'pending' ? 'sent' : connection.status;
     }
-    
+
     // If current user is the receiver, show "Request Received"
     return connection.status === 'pending' ? 'received' : connection.status;
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="py-8 text-center text-muted-foreground">Loading suggestions...</div>;
+  }
+
+  if (users.length === 0) {
+    return null;
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connect with {userRole === 'student' ? 'Alumni' : 'Students'}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {users.map((user) => {
-            const status = getConnectionStatus(user.id);
-            return (
-              <UserCard 
-                key={user.id} 
-                user={user}
-                actions={
-                  !status ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleConnect(user.id)}
-                    >
-                      Connect
-                    </Button>
-                  ) : status === 'sent' ? (
-                    <span className="text-sm text-muted-foreground">Request Sent</span>
-                  ) : status === 'received' ? (
-                    <span className="text-sm text-muted-foreground">Request Received</span>
-                  ) : status === 'accepted' ? (
-                    <span className="text-sm text-green-500">Connected</span>
-                  ) : null
-                }
-              />
-            );
-          })}
-          <Button asChild className="w-full">
-            <Link href="/discover">View More</Link>
-          </Button>
+    <section>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">
+            {userRole === 'student' ? 'Suggested Alumni' : 'Suggested Students'}
+          </h2>
+          <p className="text-sm text-muted-foreground">Expand your professional network</p>
         </div>
-      </CardContent>
-    </Card>
+        <Button variant="outline" asChild>
+          <Link href={`/${userRole}/connections`}>View All</Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {users.map((user) => {
+          const status = getConnectionStatus(user.id);
+          return (
+            <div key={user.id} className="group relative bg-card border rounded-xl p-6 hover:shadow-lg transition-all duration-300">
+              {/* Custom Card Content for Professional Look */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  {/* Avatar Placeholder or Image */}
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-semibold text-primary overflow-hidden">
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt={user.name} className="h-full w-full object-cover" />
+                    ) : (
+                      user.name?.[0]
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold leading-none">{user.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">{user.role}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Department: </span>
+                  {user.department || 'N/A'}
+                </div>
+                {user.current_company && (
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">Company: </span>
+                    {user.current_company}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-auto">
+                {!status ? (
+                  <Button
+                    className="w-full"
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleConnect(user.id);
+                    }}
+                  >
+                    Connect
+                  </Button>
+                ) : (
+                  <Button className="w-full" disabled variant="ghost">
+                    {status === 'pending' || status === 'sent' ? 'Request Sent' :
+                      status === 'received' ? 'Request Received' : 'Connected'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 } 

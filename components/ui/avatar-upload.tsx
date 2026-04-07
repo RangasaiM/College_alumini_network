@@ -18,7 +18,7 @@ export function AvatarUpload({ userId, url, onUploadComplete, onUploadStart, cla
   const [isUploading, setIsUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(url);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Update local avatar URL when prop changes
   useEffect(() => {
     setAvatarUrl(url);
@@ -61,9 +61,9 @@ export function AvatarUpload({ userId, url, onUploadComplete, onUploadStart, cla
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}-${Date.now()}.${fileExt}`;
 
-      // Upload to profile_photos bucket
+      // Upload to avatars bucket
       const { error: uploadError, data } = await supabase.storage
-        .from('profile_photos')
+        .from('avatars')
         .upload(fileName, file, {
           upsert: true,
           contentType: file.type
@@ -76,7 +76,7 @@ export function AvatarUpload({ userId, url, onUploadComplete, onUploadStart, cla
 
       // Get the public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('profile_photos')
+        .from('avatars')
         .getPublicUrl(fileName);
 
       // Update local state and notify parent

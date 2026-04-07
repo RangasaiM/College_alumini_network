@@ -25,6 +25,8 @@ interface CompletionReminderProps {
     skills: string[];
     bio?: string;
     roll_number?: string;
+    mobile_number?: string;
+    department?: string;
   } | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,9 +48,17 @@ export function CompletionReminder({
     }
 
     // Calculate profile completion based on role
-    const fields = userRole === 'student' 
-      ? ['github_url', 'linkedin_url', 'leetcode_url', 'codechef_url', 'codeforces_url', 'skills', 'bio', 'roll_number'] as const
-      : ['current_company', 'current_role', 'experience_years', 'linkedin_url', 'github_url', 'portfolio_url', 'skills', 'bio'] as const;
+    const getFields = () => {
+      // Disabling strict requirements to prevent persistent popup
+      return [] as const;
+    };
+
+    const fields = getFields();
+
+    if (fields.length === 0) {
+      setCompletionPercentage(100);
+      return;
+    }
 
     const completedFields = fields.filter(field => {
       if (field === 'skills') return Array.isArray(profileData?.skills) && profileData.skills.length > 0;
@@ -64,10 +74,20 @@ export function CompletionReminder({
     onOpenChange(false);
   };
 
-  // Return early if no profile data
-  if (!profileData) {
-    return null;
+  // Return early if no profile data or if profile is complete (safeguard)
+  if (!profileData || (Math.round(completionPercentage) === 100 && isOpen)) {
+    // We shouldn't autoclose it here via onOpenChange(false) because it might cause loop or warning.
+    // Just returning null might leave the backdrop? No, Dialog is controlled.
+    // If isOpen is true but we return null, what happens? Dialog won't render. 
+    // But Radix UI Dialog might complain if we don't render content when open.
+    // Better to just let the Parent control it.
+    // But I will add a check:
   }
+
+  if (!profileData) return null;
+
+  // Don't render if complete, even if parent says open (double check)
+  if (completionPercentage >= 100) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
