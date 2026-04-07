@@ -16,7 +16,7 @@ export default async function StudentLayout({
     userRole: user?.role
   });
 
-  if (!session) {
+  if (!session || !session.user) {
     console.log('StudentLayout: No session found');
     // Instead of redirecting to signin, redirect to root to let middleware handle it
     redirect('/');

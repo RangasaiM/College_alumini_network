@@ -6,7 +6,7 @@ export default async function AdminMessagesPage() {
   const supabase = getServerSupabase();
   const session = await getSession();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/auth/signin");
   }
 

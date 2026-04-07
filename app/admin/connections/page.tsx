@@ -6,7 +6,7 @@ export default async function AdminConnectionsPage() {
   const supabase = getServerSupabase();
   const session = await getSession();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/auth/signin");
   }
 

@@ -24,7 +24,7 @@ export default async function ConnectionsPage() {
   );
 
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  if (!session || !session.user) {
     redirect('/auth/signin');
   }
 
@@ -32,7 +32,10 @@ export default async function ConnectionsPage() {
     .from('connections')
     .select(`
       id,
+      requester_id,
+      receiver_id,
       status,
+      created_at,
       requester:users!requester_id(
         id, name, role, department, current_company, current_position, avatar_url
       ),
@@ -43,7 +46,10 @@ export default async function ConnectionsPage() {
     .or(`requester_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
     .returns<{
       id: string;
+      requester_id: string;
+      receiver_id: string;
       status: 'pending' | 'accepted';
+      created_at: string;
       requester: {
         id: string;
         name: string;

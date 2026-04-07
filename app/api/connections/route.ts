@@ -160,7 +160,7 @@ export async function PUT(request: Request) {
 
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 

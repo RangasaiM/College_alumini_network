@@ -10,7 +10,7 @@ export default async function AdminLayout({
   const session = await getServerSession();
   const user = await getServerUserDetails();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/auth/signin");
   }
 

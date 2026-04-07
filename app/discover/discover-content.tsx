@@ -36,7 +36,7 @@ export function DiscoverContent() {
   const fetchUsers = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('Please sign in to view users');
         return;
       }
@@ -66,7 +66,7 @@ export function DiscoverContent() {
   const handleConnect = async (userId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('Please sign in to connect with users');
         return;
       }

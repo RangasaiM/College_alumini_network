@@ -144,6 +144,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return NextResponse.json({ message: 'Connection removed' });
   } catch (error) {
     console.error('Error removing connection:', error);
-    return errorResponse(error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 } 

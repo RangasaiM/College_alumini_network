@@ -61,7 +61,7 @@ export function UserProfileView({ user, currentUser, isOwnProfile = false, conne
   const handleConnect = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('Please sign in to connect');
         return;
       }

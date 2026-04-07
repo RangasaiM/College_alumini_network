@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { type Session, type User } from "@supabase/supabase-js";
 
 type SupabaseContextType = {
-  supabase: ReturnType<typeof createBrowserClient>;
+  supabase: any;
   session: Session | null;
   user: User | null;
   isLoading: boolean;

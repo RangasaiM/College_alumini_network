@@ -147,7 +147,7 @@ export default function PostsContent() {
     if (!newPost.trim() && !imageFile) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('You must be logged in to create a post');
         return;
       }
@@ -201,7 +201,7 @@ export default function PostsContent() {
   const handleLike = async (postId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('You must be logged in to like posts');
         return;
       }
@@ -220,7 +220,7 @@ export default function PostsContent() {
 
         setPosts(prev => prev.map(p => 
           p.id === postId 
-            ? { ...p, likes_count: [{ count: p.likes_count[0].count - 1 }], has_liked: false }
+            ? { ...p, likes_count: [{ count: getCount(p.likes_count) - 1 }], has_liked: false }
             : p
         ));
       } else {
@@ -233,7 +233,7 @@ export default function PostsContent() {
 
         setPosts(prev => prev.map(p => 
           p.id === postId 
-            ? { ...p, likes_count: [{ count: p.likes_count[0].count + 1 }], has_liked: true }
+            ? { ...p, likes_count: [{ count: getCount(p.likes_count) + 1 }], has_liked: true }
             : p
         ));
       }

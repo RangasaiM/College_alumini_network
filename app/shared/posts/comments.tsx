@@ -76,7 +76,7 @@ export function Comments({ postId, isExpanded, onToggle, onCommentCountChange }:
 
     setIsLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!session || !session.user) {
       toast.error('Please sign in to comment');
       setIsLoading(false);
       return;

@@ -35,7 +35,7 @@ export function PostCard({ post: initialPost, currentUserId, onDelete, disablePr
         const newHasLiked = !post.has_liked;
         const newCount = post.likes_count + (newHasLiked ? 1 : -1);
 
-        setPost(prev => ({
+        setPost((prev: any) => ({
             ...prev,
             has_liked: newHasLiked,
             likes_count: newCount
@@ -225,7 +225,7 @@ export function PostCard({ post: initialPost, currentUserId, onDelete, disablePr
                             postId={post.id}
                             isExpanded={true}
                             onToggle={() => setIsCommentsOpen(!isCommentsOpen)}
-                            onCommentCountChange={(count) => setPost(prev => ({ ...prev, comments_count: count }))}
+                            onCommentCountChange={(count) => setPost((prev: any) => ({ ...prev, comments_count: count }))}
                         />
                     </div>
                 )

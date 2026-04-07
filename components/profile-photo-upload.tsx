@@ -3,10 +3,10 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useCallback, useState } from 'react';
 import Image from 'next/image';
-import { Database } from '@/lib/database.types';
+
 
 export default function ProfilePhotoUpload() {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
   const [uploading, setUploading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

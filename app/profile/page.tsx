@@ -35,7 +35,7 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('You must be logged in to view your profile');
         return;
       }
@@ -75,7 +75,7 @@ export default function ProfilePage() {
     e.preventDefault();
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         toast.error('You must be logged in to update your profile');
         return;
       }

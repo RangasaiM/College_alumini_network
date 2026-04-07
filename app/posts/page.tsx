@@ -94,7 +94,7 @@ export default function PostsPage() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         router.push('/auth/signin');
         return;
       }
@@ -122,7 +122,7 @@ export default function PostsPage() {
 
   const fetchPosts = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!session || !session.user) {
       router.push('/auth/signin');
       return;
     }

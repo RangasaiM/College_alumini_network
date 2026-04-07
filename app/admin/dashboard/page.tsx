@@ -90,7 +90,7 @@ async function PendingUsersList() {
 export default async function AdminDashboardPage() {
   const session = await getSession();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/auth/signin");
   }
 

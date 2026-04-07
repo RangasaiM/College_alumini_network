@@ -63,7 +63,7 @@ export default function AnnouncementsPage() {
 
   const checkSession = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!session || !session.user) {
       router.push("/signin");
       return;
     }

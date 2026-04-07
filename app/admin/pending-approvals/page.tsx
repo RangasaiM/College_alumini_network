@@ -11,7 +11,7 @@ import { ApprovalActions } from "./approval-actions";
 export default async function PendingApprovalsPage() {
   const session = await getSession();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/signin");
   }
 

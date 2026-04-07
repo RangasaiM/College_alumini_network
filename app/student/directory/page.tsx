@@ -9,7 +9,7 @@ import { DirectorySearch } from "@/components/directory/directory-search";
 export default async function StudentDirectoryPage() {
   const session = await getSession();
   
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/signin");
   }
   

@@ -20,7 +20,7 @@ export default function PendingApprovalPage() {
     const checkStatus = async () => {
       const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (!session || !session.user) {
         router.push('/auth/signin');
         return;
       }

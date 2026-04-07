@@ -113,7 +113,7 @@ export function ProfileTabs({ user, isCurrentUser }: ProfileTabsProps) {
 
       {isCurrentUser && (
         <TabsContent value="edit">
-          <ProfileForm user={user} />
+          <ProfileForm userRole={user.role} initialData={user} />
         </TabsContent>
       )}
 

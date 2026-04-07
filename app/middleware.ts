@@ -86,7 +86,7 @@ export async function middleware(req: NextRequest) {
     }
 
     // If user is not signed in and trying to access a protected route
-    if (!session) {
+    if (!session || !session.user) {
       console.log('Middleware: No session found, redirecting to signin');
       return NextResponse.redirect(new URL('/auth/signin', req.url));
     }

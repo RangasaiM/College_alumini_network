@@ -45,7 +45,7 @@ export default function MyPosts() {
     const fetchMyPosts = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        if (!session || !session.user) {
           toast.error('You must be logged in to view your posts');
           return;
         }

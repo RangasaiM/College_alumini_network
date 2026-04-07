@@ -38,7 +38,7 @@ export default function AdminProfileEditPage() {
   useEffect(() => {
     const fetchUserData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         router.push('/auth/signin');
         return;
       }
@@ -75,7 +75,7 @@ export default function AdminProfileEditPage() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session || !session.user) {
         router.push('/auth/signin');
         return;
       }
